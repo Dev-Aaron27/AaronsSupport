@@ -4,7 +4,7 @@ Import `egg-aarons-support.json` into Pterodactyl 1.x to create servers with the
 
 The runtime uses **ghcr.io/parkervcp/yolks:nodejs_24**, and the installer uses **node:24-bookworm-slim**. Use Node.js 24 or newer; earlier images do not provide the SQLite API used by this bot.
 
-[Download the importable egg](downloads/egg-aarons-support.json)
+[Download the importable egg](../deploy/pterodactyl/egg-aarons-support.json)
 
 ## Import and create a server
 
@@ -14,9 +14,9 @@ The runtime uses **ghcr.io/parkervcp/yolks:nodejs_24**, and the installer uses *
 4. Assign a primary allocation; Pterodactyl requires one even when the bot does not listen on a port. The allocation is only used if you enable the optional private log viewer.
 5. Fill in the three required Startup variables: **Discord Bot Token**, **Discord Server ID**, and **Staff Role IDs**. Role lists accept comma-separated IDs.
 6. Wait for installation to finish, then start the server. A ready bot prints `Ready: moderator inbox for server ...` and the panel marks it running.
-7. With category/log variables blank, run `.setup` in Discord as the server owner or a configured bot owner. It creates the private category and log channel. Test a DM and staff reply before opening it to members.
+7. With category/log variables blank, run `.setup` in Discord as the server owner or a configured bot owner. It creates the private category and log channel. You can then start handling DMs.
 
-Enable Message Content Intent and give the bot the permissions in the [Discord setup guide](setup.html). The default command prefix is **`.`**.
+Enable Message Content Intent and give the bot the permissions in the [Discord setup guide](setup.md). The default command prefix is **`.`**.
 
 The startup command is fixed and contains no credentials:
 
@@ -46,7 +46,7 @@ Nonempty panel values override config.json and matching saved runtime settings *
 
 The first start writes a valid config.json using your panel settings. Later starts preserve that file; advanced settings can be edited through the file manager or the normal bot commands. An invalid JSON file is reported rather than overwritten. No token or OAuth secret is written into config.json or bundled in the egg.
 
-Pterodactyl's Startup settings are not a secret vault: administrators and users with permission to view startup variables may see tokens. Restrict those permissions and never put secrets in the startup command, a public egg export, or screenshots. The `.env` file is not loaded by this egg; use the panel variables.
+Administrators and users who can view Startup variables may see tokens. Restrict that access. Enter your token through the panel variables; this egg does not load `.env`.
 
 ## Persistent layout
 
@@ -68,25 +68,13 @@ Set LOG_VIEWER_URL to your public HTTPS origin, and set both OAuth client variab
 
 Point an HTTPS reverse proxy at that allocation. A Pterodactyl allocation supplies a TCP endpoint, not an HTTPS certificate. Restrict the raw HTTP allocation to your proxy where possible; clients should use the HTTPS hostname. The bot's DM functionality uses outbound connections and does not require this viewer to be enabled. Leave LOG_VIEWER_URL blank to disable it.
 
-See [OAuth authentication and access rules](oauth.html). Never host private logs on the public GitHub Pages docs site.
+See [OAuth authentication and access rules](oauth.md). Never host private logs on the public GitHub Pages docs site.
 
 ## Backups and migration
 
 Stop the server, then use panel backups or copy **config.json, data/, and plugins/** together. Save the panel's environment settings separately in your secret manager. Restore them into the same layout before starting one bot process. Never share the same data directory/token across simultaneously running servers.
 
 Archives currently store absolute local paths. If migrating from Docker's `/app/data` or another host path, update `tickets.archive_path` to point to the matching files under `/home/container/data/archives/` in an offline copy of the SQLite database. Keep a pre-migration backup; verify `.log` for a closed ticket before reopening the bot to members. New Pterodactyl servers and reinstalls already use the correct path.
-
-## Regenerate the egg
-
-Maintainers with Node.js 24 and GNU tar can package the current working tree:
-
-```sh
-npm run pterodactyl:build
-```
-
-This writes the importable egg, a separate application archive, and SHA256SUMS under deploy/pterodactyl/. The egg's installation script checks its embedded archive checksum before extraction. The separate archive is provided for inspection/manual distribution; you only need the JSON egg for normal panel installation. The build is deterministic for identical inputs and includes only an explicit source/config-example/docs allowlist. Runtime config, data, tokens, node_modules and custom plugins are excluded.
-
-The repository's CI rebuilds the egg and checks that the committed JSON and checksums match the source. Rebuild whenever changing bundled application files or documentation. Review eggs before importing: an egg's installation script runs in the installer container with access to the server volume.
 
 ## Troubleshooting
 
@@ -100,5 +88,6 @@ The repository's CI rebuilds the egg and checks that the committed JSON and chec
 
 ## Further reading
 
+- [Contributor guide for egg packaging](../CONTRIBUTING.md#pterodactyl-egg)
 - [Pterodactyl panel](https://github.com/pterodactyl/panel)
 - [Node.js 24 runtime image](https://github.com/parkervcp/yolks/tree/master/nodejs/24)

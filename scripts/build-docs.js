@@ -26,11 +26,17 @@ for (const file of ['style.css', 'site.js', 'favicon.svg']) {
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const plain = value => value.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[`*]/g, '');
 const slugify = value => plain(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function websiteLink(href) {
+  if (href === '../deploy/pterodactyl/egg-aarons-support.json') return 'downloads/egg-aarons-support.json';
+  if (href.startsWith('../CONTRIBUTING.md')) return `${repository}/blob/main/${href.slice(3)}`;
+  if (/^[a-z-]+\.md(?:#.*)?$/.test(href)) return href.replace('.md', '.html');
+  return href;
+}
 function inline(source) {
   return source.split(/(`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g).map(part => {
     if (part.startsWith('`') && part.endsWith('`')) return `<code>${esc(part.slice(1, -1))}</code>`;
     const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
-    if (link && !/^(?:javascript|data|vbscript):/i.test(link[2])) return `<a href="${esc(link[2])}">${esc(link[1])}</a>`;
+    if (link && !/^(?:javascript|data|vbscript):/i.test(link[2])) return `<a href="${esc(websiteLink(link[2]))}">${esc(link[1])}</a>`;
     if (part.startsWith('**') && part.endsWith('**')) return `<strong>${inline(part.slice(2, -2))}</strong>`;
     return esc(part);
   }).join('');

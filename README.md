@@ -1,64 +1,93 @@
 # Aaron’s Support
 
-An advanced, self-hosted Discord modmail bot with a private shared inbox, Components V2 throughout, SQLite persistence, and a default `.` prefix.
+A self-hosted modmail bot for Discord. Give your moderation team a shared inbox where members can ask questions, send reports, and follow up privately.
+
+Members DM the bot. Staff receive the conversation in a private server channel and reply through the bot’s account. When the conversation ends, the bot saves a transcript and posts it to your log channel.
+
+[Documentation](docs/index.md) · [Pterodactyl setup](docs/pterodactyl.md) · [Report a bug](https://github.com/Dev-Aaron27/AaronsSupport/issues)
 
 ## Features
 
-- Private staff channels, shared participants, named/anonymous replies, plain/formatted variants, internal notes, and canned replies.
-- Mention redaction: `@everyone 67` becomes `[REMOVED_PING] 67`. User-provided mentions never ping staff or participants.
-- Text/image/file relay, synchronized edits/deletes, per-recipient retry tracking, complete local attachment archives, and private log links.
-- Five command permission levels; command aliases, role/user blocks, account/join-age gates, availability controls, notification subscriptions, and channel repair.
-- Persistent snoozing, queued-message replay, scheduled closure, confirmed bulk unsnooze, and first-message snippet triggers.
-- Trusted local JavaScript plugins with commands, lifecycle hooks, and namespaced storage.
-- Optional Discord OAuth log viewer. Public documentation is built for GitHub Pages; private conversations stay on your host and in Discord.
+- **Shared inbox:** private staff channels, named or anonymous replies, internal notes, and conversations with multiple members.
+- **Message relay:** text, images, and files, with synchronized edits and deletes.
+- **Conversation history:** saved transcripts and attachments, member history search, and an optional log viewer with Discord login.
+- **Staff tools:** canned replies, command aliases, notifications, snoozing, and scheduled closing.
+- **Access controls:** five command permission levels, user and role blocks, and minimum account and membership ages.
+- **Customization:** bot status, prefix, colors, welcome messages, and local JavaScript plugins.
+- **Mention removal:** `@everyone 67` is relayed as `[REMOVED_PING] 67`.
 
-## Quick start
+The default prefix is **`.`**. Replies use Discord Components V2.
 
-Requires Docker Compose, or Node.js 24+ for a direct deployment.
+## Hosting
+
+| Method | Requirements | Guide |
+| --- | --- | --- |
+| Pterodactyl | A Pterodactyl 1.x panel and the supplied Node.js 24 egg | [Panel setup](docs/pterodactyl.md) |
+| Docker Compose | A host with Docker Engine and Compose | [Docker installation](docs/setup.md#docker-compose) |
+| Node.js | Node.js 24 or newer and a process manager | [Node installation](docs/setup.md#run-with-node) |
+
+Run one instance per Discord server, bot token, and data directory.
+
+## Install with Pterodactyl
+
+1. Import [egg-aarons-support.json](deploy/pterodactyl/egg-aarons-support.json) through **Admin → Nests → Import Egg**.
+2. Create a server using the egg’s Node.js 24 image.
+3. Enter the bot token, Discord server ID, and staff role IDs in **Startup**.
+4. Start the server, then run `.setup` in Discord as the server owner.
+
+The egg installs the application and dependencies. Configuration, conversation data, and custom plugins survive reinstalls. The [Pterodactyl guide](docs/pterodactyl.md) covers backups and the optional log viewer.
+
+## Install with Docker
+
+Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications), enable **Message Content Intent**, and invite it with the permissions in the [installation guide](docs/setup.md#discord-application).
 
 ```sh
+git clone https://github.com/Dev-Aaron27/AaronsSupport.git
+cd AaronsSupport
 cp .env.example .env
 cp config.example.json config.json
-# Set your token in .env, and guildId/staffRoleIds in config.json.
+```
+
+Set `DISCORD_TOKEN` in `.env`, then set `guildId` and `staffRoleIds` in `config.json`. Leave `categoryId` and `logChannelId` as `null` to let `.setup` create them.
+
+```sh
 docker compose up -d --build
 ```
 
-Enable Message Content Intent and invite the bot with the permissions in the [setup guide](docs/setup.md). With category/log IDs set to null, the server owner can run `.setup` to create them. Run `.help` to browse commands with permission-aware buttons.
+Once the bot is online, run `.setup` as the server owner. See the [installation guide](docs/setup.md) for existing channels, direct Node hosting, and file permissions.
 
-**Ordinary staff messages are anonymous replies.** Use `.reply` for a moderator display name, `.areply` for anonymity, and `.note` for internal discussion. Set `alwaysAnonymous` to true to make every staff reply anonymous.
+## Using the bot
 
-## Pterodactyl
+| Command | Purpose |
+| --- | --- |
+| `.reply <text>` | Reply with your server display name |
+| `.areply <text>` | Reply as “Moderation team” |
+| `.note <text>` | Leave a note for staff |
+| `.close` | Close the thread and save its logs |
+| `.close 2h [reason]` | Schedule closure in two hours |
+| `.logs [member ID]` | Look up a member’s conversations |
+| `.help [command]` | Browse commands or check their usage |
 
-Import [egg-aarons-support.json](deploy/pterodactyl/egg-aarons-support.json) to provision preinstalled servers on Node.js 24. The egg includes the application bundle, so no GitHub credentials or source download is needed. Set the token, server ID, and staff role IDs in Startup, then run `.setup` in Discord. See the [panel hosting guide](docs/pterodactyl.md) for persistent data, optional OAuth, and reinstall instructions.
+**Ordinary messages in a staff thread are sent to the member as anonymous replies.** Use `.note` for staff-only discussion. Scheduled closes stay active until you use `.cancelclose`.
 
-Maintainers regenerate the egg with `npm run pterodactyl:build`.
+The [usage guide](docs/usage.md) covers replies, attachments, snippets, participants, and notifications.
 
 ## Documentation
 
-- [Introduction](docs/index.md)
 - [Choosing a host](docs/choose-host.md)
-- [Usage guide](docs/usage.md)
-- [Frequently asked questions](docs/faq.md)
-- [Setup and deployment](docs/setup.md)
+- [Installation](docs/setup.md)
 - [Configuration and permissions](docs/configuration.md)
-- [Plugin development](docs/plugins.md)
-- [OAuth log viewer](docs/oauth.md)
-- [Backups, recovery, updates, and GitHub Pages](docs/operations.md)
+- [Plugins](docs/plugins.md)
+- [Log viewer](docs/oauth.md)
+- [Backups and updates](docs/operations.md)
+- [Frequently asked questions](docs/faq.md)
 
-Build the searchable command reference and complete site with `npm run docs:build`. The Pages workflow deploys `_site` when changes reach main. Enable **Settings → Pages → GitHub Actions** first. The expected URL is `https://dev-aaron27.github.io/AaronsSupport/`; deployment is not performed by a local docs build.
+## Conversation data
 
-## Development
+Conversations, attachments, and archives are stored on your host. Audit records include internal notes, moderator identities, and deleted content. Keep backups private and let members know your retention policy. The optional web viewer checks staff membership before granting access.
 
-```sh
-npm ci
-npm run check
-npm test
-npm run docs:build
-npm audit --omit=dev
-```
+## Contributing and support
 
-Tests cover routing, mention removal, message revisions, participant fan-out, retries, snooze persistence, permissions, confirmation flows, plugins, migration, and OAuth access controls. Live Discord Gateway delivery and OAuth consent still require a configured real application/server.
+Bug reports, documentation fixes, and feature suggestions are welcome through [GitHub Issues](https://github.com/Dev-Aaron27/AaronsSupport/issues). Include the command or action involved and relevant console output, with private information removed.
 
-Run one instance against a persistent data directory. Back up before upgrading. Archives retain deleted messages and staff identities; make your retention policy clear to members. `.update check` checks release metadata and gives host update instructions; it does not update the running process from chat.
-
-This is a JavaScript implementation for this repository. Python plugins from modmail-dev are not compatible.
+For development setup, automated checks, documentation builds, and egg packaging, see [CONTRIBUTING.md](CONTRIBUTING.md).

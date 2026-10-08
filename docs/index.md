@@ -22,9 +22,9 @@ We use **thread** to mean one modmail conversation. Each thread uses a regular D
 
 ## Getting started
 
-Start with [Choosing a host](choose-host.html) if you haven’t decided where to run the bot. If you already have Pterodactyl, [import the egg](pterodactyl.html) to install it through your panel.
+Start with [Choosing a host](choose-host.md) if you haven’t decided where to run the bot. If you already have Pterodactyl, [import the egg](pterodactyl.md) to install it through your panel.
 
-The [installation guide](setup.html) covers creating the Discord application and running it with Docker or Node.js. Once it is online, follow the [usage guide](usage.html) to open a test thread, reply, and save its logs.
+The [installation guide](setup.md) covers creating the Discord application and running it with Docker or Node.js. Once it is online, follow the [usage guide](usage.md) to open a thread, reply, and save its logs.
 
 ## Reading the commands
 
@@ -41,4 +41,4 @@ For example, `.reply Thanks for letting us know.` sends a reply, and `.close 2h 
 
 ## About the project
 
-The [source code](https://github.com/Dev-Aaron27/AaronsSupport) is maintained in the Aaron’s Support repository. This bot runs on Node.js; plugins written for modmail-dev’s Python bot will need to be rewritten for [our plugin API](plugins.html).
+The [source code](https://github.com/Dev-Aaron27/AaronsSupport) is maintained in the Aaron’s Support repository. This bot runs on Node.js; plugins written for modmail-dev’s Python bot will need to be rewritten for [our plugin API](plugins.md).

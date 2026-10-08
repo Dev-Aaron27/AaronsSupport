@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const destination = resolve(process.argv[2] || join(root, 'deploy/pterodactyl'));
 const scratch = await mkdtemp(join(tmpdir(), 'modmail-egg-'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const files = ['package.json', 'package-lock.json', 'config.example.json', 'README.md', 'scripts/pterodactyl-start.js'];
+const files = ['package.json', 'package-lock.json', 'config.example.json', 'README.md', 'CONTRIBUTING.md', 'scripts/pterodactyl-start.js'];
 async function collect(directory, extension) {
   for (const entry of await readdir(join(root, directory), { withFileTypes: true })) {
     if (entry.isSymbolicLink()) throw new Error(`Bundle source must not contain symlinks: ${directory}/${entry.name}`);

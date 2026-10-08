@@ -8,7 +8,7 @@ If you already use a Pterodactyl panel, this is the simplest option. Import the 
 
 Your configuration, logs, and plugins are kept outside the managed application folder, so they survive a reinstall. Panel backups can save them together.
 
-[Set up Pterodactyl hosting](pterodactyl.html)
+[Set up Pterodactyl hosting](pterodactyl.md)
 
 ## Docker Compose
 
@@ -16,7 +16,7 @@ Use Docker Compose on a VPS or a computer you leave running. The repository incl
 
 You manage updates, backups, and service restarts on the host. Docker’s restart policy restarts the bot after a crash or host reboot.
 
-[Install with Docker Compose](setup.html#docker-compose)
+[Install with Docker Compose](setup.md#docker-compose)
 
 ## Node.js
 
@@ -24,7 +24,7 @@ You can also run the bot directly with Node.js 24 or newer. Install the dependen
 
 Use a process manager to restart it after failures and start it when your host boots. Keep the data directory on persistent storage.
 
-[Install with Node.js](setup.html#run-with-node-js)
+[Install with Node.js](setup.md#run-with-node)
 
 ## What your host needs
 

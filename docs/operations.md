@@ -48,22 +48,6 @@ docker compose up -d --build
 
 Schema additions migrate existing version 1 data automatically. Back up before upgrading; rolling back application code is not a database downgrade procedure. Use `.changelog` for the summary and `.debug` for recent sanitized operational events. Exception bodies, tokens, and DM content are not included in debug output.
 
-## GitHub Pages documentation
-
-The Pages workflow builds this static site on pushes to main or a manual workflow dispatch. In repository Settings → Pages, choose **GitHub Actions** as the build source. Merge/publish the workflow before running it. A successful deployment is normally available at:
-
-```text
-https://dev-aaron27.github.io/AaronsSupport/
-```
-
-This address is the expected GitHub Pages URL, not proof that deployment has run. Custom domains or repository Pages policy can change it. The build uses relative links so the repository subpath works.
-
-```sh
-npm run docs:build
-```
-
-The generated `_site` directory contains only public docs. Command documentation is generated from the same catalog used by help and authorization. The workflow grants pages:write and id-token:write only to the deployment job.
-
 ## Known limits
 
 - One server and one running process per bot token/data directory.
@@ -73,5 +57,3 @@ The generated `_site` directory contains only public docs. Command documentation
 - Native edit/delete synchronization applies while a ticket is active. Commands preserve the original reply identity/layout when editing. Editing a source message after changing the configured command prefix may require `.edit` instead.
 - Snoozing preserves private channel permissions; it is not a per-moderator access control feature.
 - `.disable all` pauses new relay delivery. Existing-message edit/delete synchronization remains available.
-
-Run `npm test`, `npm run check`, `npm audit --omit=dev`, and `npm run docs:build` before deploying. Test with a real Discord server before admitting members.

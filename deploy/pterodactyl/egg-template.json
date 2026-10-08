@@ -3,7 +3,7 @@
   "meta": { "version": "PTDL_v2", "update_url": null },
   "name": "Aaron's Support — Discord Modmail (Node.js 24)",
   "author": "maintainers@aaronssupport.invalid",
-  "description": "Self-contained Discord modmail with Components V2, SQLite archives, plugins, and optional OAuth logs. Installs the bundled application and locked npm dependencies automatically. Requires a Discord token, server ID and staff role IDs. Persistent config.json, data/ and plugins/ survive reinstall. No GitHub token or public source release required.",
+  "description": "Self-contained Discord modmail with Components V2, SQLite archives, plugins, and optional OAuth logs. Installs the bundled application and locked npm dependencies automatically. Requires a Discord token, server ID and staff role IDs. Persistent config.json, data/ and plugins/ survive reinstall.",
   "features": null,
   "docker_images": { "Node.js 24": "ghcr.io/parkervcp/yolks:nodejs_24" },
   "file_denylist": [],

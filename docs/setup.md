@@ -2,7 +2,7 @@
 
 ## Discord application
 
-Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Save its Bot token privately and enable **Message Content Intent**. Server Members and Presence privileged intents are not required: membership checks use the single-member REST endpoint.
+Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Save its Bot token privately and enable **Message Content Intent**. Server Members and Presence privileged intents are not required.
 
 Invite the application using the `bot` OAuth scope and these permissions:
 
@@ -23,7 +23,7 @@ git clone https://github.com/Dev-Aaron27/AaronsSupport.git
 cd AaronsSupport
 ```
 
-If you are using the Pterodactyl egg, follow the [panel guide](pterodactyl.html) instead. It installs the source and dependencies for you.
+If you are using the Pterodactyl egg, follow the [panel guide](pterodactyl.md) instead. It installs the source and dependencies for you.
 
 ## Configuration
 
@@ -42,7 +42,7 @@ Discord permits 50 channels in one category. A log channel in the same category 
 
 ## Pterodactyl hosting
 
-Use the [Pterodactyl egg and panel guide](pterodactyl.html) to create preinstalled servers with persistent data and Startup variables. The self-contained egg includes the application source; no GitHub login is needed.
+Use the [Pterodactyl egg and panel guide](pterodactyl.md) to create preinstalled servers with persistent data and Startup variables. The self-contained egg includes the application source; no GitHub login is needed.
 
 ## Docker Compose
 
@@ -53,7 +53,7 @@ docker compose up -d --build
 docker compose logs -f modmail
 ```
 
-Wait for `Ready: moderator inbox for server ...`. The container runs as UID 1000 with a read-only root filesystem. SQLite, attachments, archives, and runtime settings live in the persistent `inbox-data` volume. The reviewed local `plugins` directory is mounted read-only.
+Wait for `Ready: moderator inbox for server ...`. The container runs as UID 1000 with a read-only root filesystem. SQLite, attachments, archives, and runtime settings live in the persistent `inbox-data` volume. Your local `plugins` directory is mounted read-only.
 
 Configuration and plugins must be readable by UID 1000 inside the container. On a host with different ownership, grant read access to these non-token files. The token is passed through Compose's environment file, not mounted into the image.
 
@@ -64,9 +64,9 @@ docker compose down
 
 Do not use `down -v` unless intentionally deleting all conversation data. Run one bot process for each token/data directory. Outbound HTTPS and Discord Gateway WebSocket access are required. The bot needs no inbound port unless you enable the optional log viewer.
 
-## Run with Node.js
+## Run with Node
 
-Requires Node.js 24+. SQLite is built into Node; some Node 24 releases print an experimental SQLite warning.
+Install Node.js 24 or newer, then run:
 
 ```sh
 npm ci
@@ -75,12 +75,8 @@ npm start
 
 Environment variables: `DISCORD_TOKEN`, `CONFIG_PATH` (default `./config.json`), `DATA_DIR` (default `./data`), and `PLUGIN_DIR` (default `./plugins`). Use a process manager for restart-on-failure behavior.
 
-## Verify in your server
+## Start using the inbox
 
-1. Send a DM from a non-staff test account, including an image.
-2. Reply with `.reply`, then send a staff-only `.note`.
-3. Edit and delete a message and check its relayed copy.
-4. Confirm regular members cannot see the staff or log channel.
-5. Close the thread and open the transcript posted in your log channel.
+Run `.selfcontact` in Discord to open a conversation with yourself. Send a reply with `.reply`, then close it with `.close` to save the transcript in your log channel.
 
-The [usage guide](usage.html) covers the other commands you will use day to day.
+The [usage guide](usage.md) covers the commands staff use day to day.
