@@ -91,6 +91,7 @@ test('self-contained egg matches its source, preserves PTDL_v2 contract and excl
   for (const key of ['DISCORD_TOKEN', 'MODMAIL_GUILD_ID', 'MODMAIL_STAFF_ROLE_IDS']) assert.ok(egg.variables.find(v => v.env_variable === key).rules.startsWith('required|'));
   for (const key of ['DISCORD_TOKEN', 'DISCORD_CLIENT_SECRET']) assert.equal(egg.variables.find(v => v.env_variable === key).default_value, '');
   const script = egg.scripts.installation.script;
+  assert.ok(Buffer.byteLength(script, 'utf8') <= 65_535, 'Installer must fit the Panel script_install TEXT column.');
   assert.equal(spawnSync('bash', ['-n'], { input: script }).status, 0);
   const embedded = script.split("<<'AARONS_SUPPORT_BUNDLE'\n")[1].split('\nAARONS_SUPPORT_BUNDLE')[0];
   const bytes = Buffer.from(embedded, 'base64'), hash = createHash('sha256').update(bytes).digest('hex');
@@ -98,6 +99,14 @@ test('self-contained egg matches its source, preserves PTDL_v2 contract and excl
   const entries = execFileSync('tar', ['-tf', '-'], { input: gunzipSync(bytes), encoding: 'utf8' }).trim().split('\n');
   assert.ok(entries.includes('./src/main.js')); assert.ok(entries.includes('./scripts/pterodactyl-start.js'));
   assert.ok(entries.includes('./pterodactyl-release.json'));
+  assert.ok(!entries.some(path => path.startsWith('./docs/') || path === './CONTRIBUTING.md'), 'Runtime bundle must omit documentation to fit Panel storage.');
   assert.ok(!entries.some(path => /(^|\/)(\.env|config\.json|data|node_modules|\.git)(\/|$)/.test(path)));
   assert.ok(!entries.some(path => path.startsWith('/') || path.split('/').includes('..')));
+});
+
+test('build template fails clearly if imported instead of the generated egg', async () => {
+  const template = JSON.parse(await readFile('deploy/pterodactyl/egg-template.json', 'utf8'));
+  const result = spawnSync('bash', [], { input: template.scripts.installation.script, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Wrong egg: import egg-aarons-support.json/);
 });

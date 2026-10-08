@@ -4,6 +4,7 @@ import { parseCommand } from './config.js';
 import { commands, replyCommands } from './catalog.js';
 import { CommandRouter } from './commands.js';
 import { panel, chunks, sendPanels, formatVariables, stripPings } from './ui.js';
+import { safeError } from './logging.js';
 import { authorize } from './permissions.js';
 
 const publicCommands=new Set(['help','about','changelog','sponsors','selfcontact']);
@@ -17,33 +18,48 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
   }
   on(Events.MessageCreate,m=>m.channelId,async message=>{
     if(message.author.bot || message.webhookId)return;
-    let ctx,privateChannel=false;
+    let ctx,commandLabel='member message';
+    const respond = (text) => sendPanels(message.channel,text,{color:config.colors.system});
     try {
       const cmd=parseCommand(message.content,config);
+      const known = step => Object.hasOwn(commands,step.name) || plugins?.command(step.name);
+      if(cmd) {
+        commandLabel=(cmd.steps || [cmd]).map(step=>known(step)?step.name:'unknown').join(' + ');
+        transport.info?.('commands',`Received ${commandLabel}; user ${message.author.id}; channel ${message.channelId}.`);
+      }
       if(!message.guildId) {
         if(message.channel.type!==ChannelType.DM)return;
-        if(cmd && publicCommands.has(cmd.name)){ctx=await context(message);ctx.level=Math.min(ctx.level,1);await router.execute(ctx,cmd.name,cmd.args);}
-        else await inbox.receive(message);
+        if(cmd && publicCommands.has(cmd.name)) {
+          ctx=await context(message);ctx.level=Math.min(ctx.level,1);
+          await router.dispatch(ctx,cmd);
+          transport.info?.('commands',`Completed ${commandLabel} in DMs.`);
+        } else await inbox.receive(message);
         return;
       }
-      if(message.guildId!==config.guildId)return;
-      const ticket=store.byChannel(message.channelId);
-      privateChannel=Boolean(ticket || message.channelId===config.logChannelId);
-      if(!privateChannel && (!cmd || !publicCommands.has(cmd.name) && cmd.name!=='setup'))return;
-      ctx=await context(message);
-      if(privateChannel){if(ctx.level<2)return;await transport.assertPrivate(message.channel);}
-      else if(cmd.name!=='setup')ctx.level=Math.min(ctx.level,1);
-      if(cmd) {
-        if(!Object.hasOwn(commands,cmd.name) && !plugins?.command(cmd.name))throw new Error(`Unknown command. Use ${config.prefix}help.`);
-        await router.execute(ctx,cmd.name,cmd.args);
-      } else if(ticket) {
-        authorize('areply',ctx.level,config,plugins);
-        await inbox.reply(ticket,message,message.content,false,{anonymous:true,plain:false});
+      if(!cmd)return; // Staff conversation is local; only commands can relay replies.
+      if(message.guildId!==config.guildId) {
+        transport.info?.('commands',`Rejected ${commandLabel}: command came from a different server.`);
+        return await respond('This bot is configured for another server. Check Discord Server ID in the hosting settings.');
       }
+      ctx=await context(message);
+      if(!(cmd.steps || [cmd]).every(known))throw new Error(`Unknown command. Use ${config.prefix}help.`);
+      for(const step of cmd.steps || [cmd])authorize(step.name,ctx.level,config,plugins);
+      // Check the entire alias, so a public first step cannot bypass the channel rule.
+      const needsPrivate=(cmd.steps || [cmd]).some(step=>!publicCommands.has(step.name) && step.name!=='setup');
+      if(needsPrivate) {
+        try { await transport.assertPrivate(message.channel); }
+        catch(error) {
+          transport.report(error,`commands ${commandLabel}: privacy check`);
+          return await respond(`Use this command in a private staff channel, an inbox ticket, or the modmail log channel. Only configured staff may have access. Use ${config.prefix}setup first if the inbox has not been configured.`);
+        }
+      }
+      await router.dispatch(ctx,cmd);
+      transport.info?.('commands',`Completed ${commandLabel}; user ${message.author.id}; channel ${message.channelId}.`);
     } catch(error) {
-      transport.report(error,'message');
-      if(privateChannel){try{await transport.assertPrivate(message.channel);}catch{return;}}
-      await sendPanels(message.channel,error.code?'Discord could not complete that action. Check permissions and delivery status, then retry.':error.message,{color:config.colors.system}).catch(()=>{});
+      transport.report(error,`commands ${commandLabel}`);
+      const text=error.code?safeError(error):error.message;
+      try { await respond(text); }
+      catch(replyError) { transport.report(replyError,`commands ${commandLabel}: could not send the error response`); }
     }
   });
   on(Events.MessageUpdate,(_old,m)=>m.channelId,async(_old,partial)=>{
@@ -92,7 +108,7 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
       if(type==='help'){
         if(action!==interaction.user.id)throw new Error('Open your own help menu to use these buttons.');
         const privateChannel=ctx.ticket || interaction.channelId===config.logChannelId;
-        if(privateChannel)await transport.assertPrivate(interaction.channel);else ctx.level=Math.min(ctx.level,1);
+        if(privateChannel)await transport.assertPrivate(interaction.channel);
         return router.execute(ctx,'help',value);
       }
       if(!ctx.ticket && interaction.channelId!==config.logChannelId)throw new Error('Use controls inside a private modmail channel.');

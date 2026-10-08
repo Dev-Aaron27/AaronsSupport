@@ -8,9 +8,9 @@ Invite the application using the `bot` OAuth scope and these permissions:
 
 - View Channels, Send Messages, Read Message History.
 - Attach Files and Embed Links (Discord uses attachment/link permissions for rich components).
-- Manage Channels, Manage Roles, and Manage Messages.
+- Manage Channels, Manage Roles, Manage Messages, and Add Reactions.
 
-Manage Roles is required to update channel permission overwrites. In channel settings Discord calls this **Manage Permissions**. Manage Messages lets `.delete` remove the original staff command as well as the bot copies. Administrator permission is not required.
+Manage Roles is required to update channel permission overwrites. In channel settings Discord calls this **Manage Permissions**. Manage Messages lets the bot remove staff reply commands and lets `.delete` remove bot copies. Add Reactions enables the member delivery checkmark. Administrator permission is not required.
 
 Enable Developer Mode in Discord settings to copy server, category, channel, role, and user IDs.
 

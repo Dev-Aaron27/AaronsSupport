@@ -1,10 +1,12 @@
 import { ActivityType, ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { panel, sendPanels, button, stripPings } from './ui.js';
+import { log, safeError } from './logging.js';
 import { levelFor, staffRoles } from './permissions.js';
 export { installHandlers } from './handlers.js';
 
 export class DiscordTransport {
-  constructor(client, config, store) { Object.assign(this,{client,config,store}); }
+  constructor(client, config, store, logger = log) { Object.assign(this,{client,config,store,logger}); }
+  info(context,message) { this.logger.info(context,message); }
   async guild() { return this.client.guilds.fetch(this.config.guildId); }
   user(id) { return this.client.users.fetch(id); }
   async member(id) {
@@ -16,7 +18,7 @@ export class DiscordTransport {
   isAdmin(member) { return this.level(member)>=4; }
   overwrites(guild) {
     return [{id:guild.id,deny:[P.ViewChannel]},
-      {id:this.client.user.id,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks,P.ManageChannels,P.ManageRoles,P.ManageMessages]},
+      {id:this.client.user.id,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks,P.ManageChannels,P.ManageRoles,P.ManageMessages,P.AddReactions]},
       ...staffRoles(this.config).map(id=>({id,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks]})),
       ...this.config.ownerUserIds.map(id=>({id,type:1,allow:[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks]}))];
   }
@@ -41,7 +43,7 @@ export class DiscordTransport {
     const category=await guild.channels.fetch(this.config.categoryId), log=await guild.channels.fetch(this.config.logChannelId);
     if(category?.type!==ChannelType.GuildCategory || log?.type!==ChannelType.GuildText) throw new Error('Configure a category and text log channel.');
     await this.assertPrivate(category); await this.assertPrivate(log);
-    const required=[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks,P.ManageChannels,P.ManageRoles,P.ManageMessages];
+    const required=[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks,P.ManageChannels,P.ManageRoles,P.ManageMessages,P.AddReactions];
     if(!guild.members.me.permissions.has(P.ManageChannels) || !category.permissionsFor(guild.members.me).has(required) || !log.permissionsFor(guild.members.me).has(required.slice(0,5))) throw new Error('Bot is missing required permissions. See the setup guide.');
     for(const ticket of store.live()) {
       if(!ticket.channel_id) continue;
@@ -74,7 +76,9 @@ export class DiscordTransport {
     if(channel) { await channel.permissionOverwrites.set(this.overwrites(guild)); return channel; }
     const category=await guild.channels.fetch(ticket.category_id || this.config.categoryId); await this.assertPrivate(category);
     channel=await guild.channels.create({name:ticket.title || `inbox-${ticket.id}`,type:ChannelType.GuildText,parent:category.id,nsfw:Boolean(ticket.nsfw),topic:`modmail:${ticket.id}:${ticket.user_id}`,permissionOverwrites:this.overwrites(guild),reason:`Modmail #${ticket.id}`});
-    await sendPanels(channel,`${user.tag || user.username} · Member ID: ${user.id}\nOrdinary staff messages are anonymous replies. Use ${this.config.prefix}reply for a named reply, ${this.config.prefix}areply for an anonymous reply, and ${this.config.prefix}note for internal notes.\nEdits and deletions are retained in the private audit log.`,{title:`Conversation #${ticket.id}`,color:this.config.colors.system,controls:[button('Close',`ticket:close:${ticket.id}`),button('Snooze',`ticket:snooze:${ticket.id}`),button('History',`ticket:logs:${ticket.id}`)]});
+    const member = await this.member(user.id);
+    const date = timestamp => Number.isFinite(timestamp) ? `<t:${Math.floor(timestamp / 1000)}:F>` : 'Unavailable';
+    await sendPanels(channel,`**Member:** ${user.tag || user.username}\n**User ID:** ${user.id}\n**Account created:** ${date(user.createdTimestamp)}\n**Joined server:** ${date(member?.joinedTimestamp)}\n\nUse ${this.config.prefix}reply (${this.config.prefix}r) for a named reply or ${this.config.prefix}areply (${this.config.prefix}ar) for an anonymous reply. Only reply commands and snippets send messages to the member. Normal messages stay in this channel; ${this.config.prefix}note saves an internal note in the log.\n\nReplies are copied here and to the member’s DMs. Edits and deletions are retained in the private audit log.`,{title:`Conversation #${ticket.id}`,color:this.config.colors.system,controls:[button('Close',`ticket:close:${ticket.id}`),button('Snooze',`ticket:snooze:${ticket.id}`),button('History',`ticket:logs:${ticket.id}`)]});
     return channel;
   }
   async notifyOpening(ticket) {
@@ -104,12 +108,13 @@ export class DiscordTransport {
     await channel.messages.edit(row.target_id,{...payload,content:null,embeds:[],attachments:[]});
   }
   async delete(row) { try { await (await this.channel(row.target_channel))?.messages.delete(row.target_id); } catch(error) { if(error.code!==10008) throw error; } }
-  async deleteSource(row) { if(!/^\d+$/.test(row.source_id)) return; await (await this.channel(row.source_channel))?.messages.delete(row.source_id); }
+  async deleteSource(row) { const id = row.options.commandSourceId || row.source_id; if(!/^\d+$/.test(id)) return; try { await (await this.channel(row.source_channel))?.messages.delete(id); } catch(error) { if(error.code!==10008) throw error; } }
+  async acknowledge(row) { const channel = await this.channel(row.source_channel); const message = await channel.messages.fetch(row.source_id); await message.react('✅'); }
   async notifyUser(id,content) {return sendPanels(await (await this.user(id)).createDM(),content,{color:this.config.colors.system});}
   async alert(ticket,content,mentions=[]) {const channel=await this.channel(ticket.channel_id);await this.assertPrivate(channel);return sendPanels(channel,content,{color:this.config.colors.system,mentions});}
   async publishArchive(ticket,path,archives) {
     const channel=await this.channel(this.config.logChannelId); await this.assertPrivate(channel);
-    const text=`Member ID: ${ticket.user_id}\nClosed by: ${ticket.closed_by}\nReason: ${stripPings(ticket.close_reason || '—').slice(0,1800)}\nArchive follows. Extract the ZIP and open transcript.html. Join numbered parts first (see documentation).`;
+    const text=`Member ID: ${ticket.user_id}\nClosed by: ${ticket.closed_by}\nReason: ${stripPings(ticket.close_reason || 'No reason provided').slice(0,1800)}\nArchive follows. Extract the ZIP and open transcript.html. Join numbered parts first (see documentation).`;
     const [header]=await sendPanels(channel,text,{title:`Conversation #${ticket.id} closed`});
     for await(const part of archives.parts(path)) await channel.send(panel(`Archive for conversation #${ticket.id}`,{files:[part]}));
     await header.edit(panel(`${text}\n**Archive upload complete.**`,{title:`Conversation #${ticket.id} closed`}));
@@ -126,9 +131,9 @@ export class DiscordTransport {
   async setTitle(ticket,title) {if(!title || title.length>90) throw new Error('Title must have 1–90 characters.');return (await this.channel(ticket.channel_id)).setName(title);}
   async setNsfw(ticket,value) {return (await this.channel(ticket.channel_id)).setNSFW(value);}
   report(error,context) {
-    // Diagnostic command reads only these sanitized categories/codes, never exception bodies.
-    const summary=`${context}: ${error.name || 'Error'}${error.code ? ` (${error.code})` : ''}`;
-    console.error(summary);
+    // Only known operational hints are logged, never raw API errors or message bodies.
+    const summary=`${context}: ${safeError(error)}`;
+    this.logger.error(context,error);
     this.store?.event(null,'system',summary.slice(0,300));
   }
 }

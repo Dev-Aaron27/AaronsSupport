@@ -1,7 +1,0 @@
-services:
-  modmail:
-    environment:
-      LOG_VIEWER_HOST: 0.0.0.0
-      LOG_VIEWER_PORT: 8787
-    ports:
-      - '127.0.0.1:8787:8787'

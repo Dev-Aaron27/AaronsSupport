@@ -72,7 +72,7 @@ Runtime commands persist changes in SQLite and override matching file values aft
 | fpreply | Moderator display name | Unboxed text | Yes |
 | fpareply | Moderation team | Unboxed text | Yes |
 
-Supported variables: `{user.name}`, `{user.id}`, `{moderator.name}`, `{server.name}`, `{ticket.id}`. Anonymous variants substitute Moderation team for the moderator name. Unknown variables remain literal. Ordinary staff messages and snippets are anonymous by default. Use `.note` for internal discussion.
+Supported variables: `{user.name}`, `{user.id}`, `{moderator.name}`, `{server.name}`, `{ticket.id}`. Anonymous variants substitute Moderation team for the moderator name. Unknown variables remain literal. Snippets are anonymous replies. Ordinary staff messages stay in the channel; use `.note` to save internal discussion in the audit log. `.r` and `.ar` are shortcuts for `.reply` and `.areply`.
 
 The audit log retains the real moderator identity for every format. Names, variables, message bodies, and displayed attachment names pass through mention removal. `@handle` removal is deliberately conservative and also removes the domain portion of email-like text. It never enables Discord mention parsing.
 
@@ -95,9 +95,10 @@ The audit log retains the real moderator identity for every format. Names, varia
 `.disable new` blocks new tickets but keeps existing conversations running. `.disable all` blocks member intake and outgoing DM relays. `.enable` restores them; `.isenable` shows the mode. Synchronizing an existing message's edits/deletions remains available for privacy and corrections.
 
 ```text
-.snippet set welcome Thanks for contacting the team. Please describe the problem.
+.snippet add welcome Thanks for contacting the team. Please describe the problem.
 .autotrigger set greeting help welcome
-.alias set urgent areply A moderator will be with you shortly.
+.alias add urgent areply A moderator will be with you shortly.
+.alias add thanks areply Thanks for contacting support. && close 1h
 ```
 
-Autotriggers match a literal, case-insensitive keyword in the first message of a new conversation. Only the first matching rule sends its configured snippet. They cannot execute arbitrary privileged commands. Aliases expand once into a built-in command and optional preset arguments, then undergo its normal permission check.
+Autotriggers match a literal, case-insensitive keyword in the first message of a new conversation. Only the first matching rule sends its configured snippet. They cannot execute arbitrary privileged commands. Aliases expand into up to ten built-in commands separated by `&&`, with optional preset arguments. Permissions for every step are checked before execution and rechecked during it; a failure stops the sequence. Extra arguments supplied to the alias are appended to its first command. Use `.snippet name` or `.name` to send a saved anonymous reply. Alias names take precedence over snippet names.

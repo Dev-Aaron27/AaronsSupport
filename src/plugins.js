@@ -24,10 +24,10 @@ export class Plugins {
         this.registry.set(command,{...spec,plugin:name});registered.push(command);
       },
     });
-    try {await plugin.start?.(api);this.loaded.set(name,{plugin,api,registered});}
+    try {await plugin.start?.(api);this.loaded.set(name,{plugin,api,registered});this.transport.info?.('plugins',`Loaded plugin: ${name}.`);}
     catch(error){for(const cmd of registered)this.registry.delete(cmd);try{await plugin.stop?.();}catch{}throw error;}
   }
-  async unload(name) {const entry=this.loaded.get(name);if(!entry)throw new Error('Plugin is not loaded.');try{await entry.plugin.stop?.();}finally{for(const command of entry.registered)this.registry.delete(command);this.loaded.delete(name);}}
+  async unload(name) {const entry=this.loaded.get(name);if(!entry)throw new Error('Plugin is not loaded.');try{await entry.plugin.stop?.();}finally{for(const command of entry.registered)this.registry.delete(command);this.loaded.delete(name);this.transport.info?.('plugins',`Unloaded plugin: ${name}.`);}}
   async emit(event,context) {for(const [name,{plugin,api}] of this.loaded){try{await plugin.hooks?.[event]?.(structuredClone(context),api);}catch(error){this.transport.report(error,`plugin ${name} ${event}`);}}}
   async start(names) {for(const name of names){try{await this.load(name);}catch(error){this.transport.report(error,`plugin ${name} load`);}}}
   async stop() {for(const name of [...this.loaded.keys()]){try{await this.unload(name);}catch(error){this.transport.report(error,`plugin ${name} stop`);}}}

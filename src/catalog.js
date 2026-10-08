@@ -21,13 +21,13 @@ const groups = {
     subscribe: ['Notify on every member message.', '[user/role mention]'], unsubscribe: ['Remove a recurring subscription.', '[user/role mention]'],
     nsfw: ['Mark the staff channel as age-restricted.', ''], sfw: ['Remove the age-restricted flag.', ''],
     repair: ['Recreate/repair this ticket channel and replay its conversation to staff.', '[ticket number]'],
-    snippet: ['Send, set, delete, or list canned replies. Editing requires level 3.', '[name|list|set <name> <text>|delete <name>]'], snippets: ['List canned replies.', ''],
+    snippet: ['Send, add, edit, delete, or list anonymous canned replies. Editing requires level 3.', '[name|list|add <name> <text>|set <name> <text>|delete <name>]'], snippets: ['List canned replies.', ''],
     snooze: ['Queue incoming DMs, optionally until a specified duration.', '[duration]'], snoozed: ['List snoozed tickets.', '[page]'],
     unsnooze: ['Restore a conversation and replay queued DMs.', '[ticket number]'], title: ['Rename the private channel.', '<title>'], retry: ['Retry failed deliveries without duplicating successful copies.', '<message ID>'],
   },
   3: {
     block: ['Block a user or role from incoming modmail.', '<user ID|role mention> [reason]'], blocked: ['List blocked users and roles.', '[page]'], unblock: ['Unblock a user or role.', '<user ID|role mention>'],
-    move: ['Move the staff channel to a private category.', '<category ID>'], alias: ['Manage command shortcuts with optional preset arguments.', '[list|set <name> <command and args>|delete <name>]'], aliases: ['List command shortcuts.', ''],
+    move: ['Move the staff channel to a private category.', '<category ID>'], alias: ['Manage command shortcuts and sequences separated by &&.', '[list|add <name> <commands separated by &&>|set <name> <commands>|delete <name>]'], aliases: ['List command shortcuts.', ''],
   },
   4: {
     disable: ['Disable new conversations or all incoming/outgoing DMs.', '<new|all>'], enable: ['Enable all DM functions.', ''], isenable: ['Show the current DM mode.', ''],
@@ -40,7 +40,7 @@ const groups = {
     autotrigger: ['Manage first-message keyword → snippet rules.', '[list|set <name> <keyword> <snippet>|delete <name>]'],
     debug: ['View recent sanitized operational events (no message bodies or tokens).', ''],
     oauth: ['Inspect OAuth log-viewer setup, login URL, or revoke viewer sessions.', '[status|logoutall]'],
-    update: ['Check upstream release metadata and show deployment update instructions.', '[check]'],
+    update: ['Install GitHub main on Pterodactyl, or check the latest revision. Restart from the panel after installing.', '[check]'],
     plugins: ['Manage trusted local JavaScript plugins.', '[list|load <name>|unload <name>|reload <name>]'],
   },
 };

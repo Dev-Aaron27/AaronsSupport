@@ -1,3 +1,4 @@
+import { AppUpdater } from './update.js';
 import { randomBytes } from 'node:crypto';
 import { commands, replyCommands, replyOptions } from './catalog.js';
 import { authorize, requiredLevel } from './permissions.js';
@@ -10,7 +11,7 @@ const pageNumber = value => {const page=Number(value || 1);if(!Number.isSafeInte
 const requireTicket = ticket => {if(!ticket)throw new Error('Run this command inside an active inbox channel.');return ticket;};
 
 export class CommandRouter {
-  constructor(inbox,transport,store,plugins,viewer) {Object.assign(this,{inbox,transport,store,plugins,viewer});this.config=inbox.config;this.confirmations=new Map();}
+  constructor(inbox,transport,store,plugins,viewer) {Object.assign(this,{inbox,transport,store,plugins,viewer});this.config=inbox.config;this.confirmations=new Map();this.updater=process.env.MODMAIL_HOSTING==='pterodactyl'?new AppUpdater(process.cwd()):null;}
   set(key,value) {const validated=validateConfig({...this.config,[key]:value});this.store.setSetting(key,validated[key]);this.config[key]=validated[key];return validated[key];}
   async target(value,actorId) {
     const role=/^<@&(\d{17,20})>$/.exec(value);
@@ -39,14 +40,36 @@ export class CommandRouter {
     await ctx.respond('Archiving conversation…');await this.inbox.close(ticket,'Closed from staff controls',ctx.message.author.id);
   }
   async help(ctx,args) {
+    if(args==='r')args='reply';if(args==='ar')args='areply';
     const item=commands[args] || this.plugins?.command(args);
-    if(item) {authorize(args,ctx.level,this.config,this.plugins);return ctx.respond(`${item.description}\nUsage: ${this.config.prefix}${args}${item.usage?' '+item.usage:''}\nPermission level: ${requiredLevel(args,this.config,this.plugins)}${replyCommands.has(args)?'\nVariables: {user.name}, {user.id}, {moderator.name}, {server.name}, {ticket.id}.':''}`,{title:args});}
-    const available=[...Object.values(commands),...[...(this.plugins?.registry || [])].map(([name,spec])=>({name,...spec}))].filter(c=>requiredLevel(c.name,this.config,this.plugins)<=ctx.level);
+    if(item) {return ctx.respond(`${item.description}\nUsage: ${this.config.prefix}${args}${item.usage?' '+item.usage:''}\nPermission level: ${requiredLevel(args,this.config,this.plugins)}${replyCommands.has(args)?'\nVariables: {user.name}, {user.id}, {moderator.name}, {server.name}, {ticket.id}.':''}`,{title:args});}
+    const available=[...Object.values(commands),...[...(this.plugins?.registry || [])].map(([name,spec])=>({name,...spec}))];
     const pages=Math.max(1,Math.ceil(available.length/10)), page=Math.min(pageNumber(args),pages);
     const controls=[];
     if(page>1)controls.push(button('Previous',`help:${ctx.message.author.id}:${page-1}`));
     if(page<pages)controls.push(button('Next',`help:${ctx.message.author.id}:${page+1}`));
-    return ctx.respond(available.slice((page-1)*10,page*10).map(c=>`**[${requiredLevel(c.name,this.config,this.plugins)}] ${this.config.prefix}${c.name}** — ${c.description}`).join('\n')+`\n\nPage ${page} of ${pages} · ${this.config.prefix}help command for details.`,{title:'Modmail commands',controls});
+    return ctx.respond(available.slice((page-1)*10,page*10).map(c=>`**[${requiredLevel(c.name,this.config,this.plugins)}] ${this.config.prefix}${c.name}**: ${c.description}`).join('\n')+`\n\nPage ${page} of ${pages} · ${this.config.prefix}help command for details.\nNumbers in brackets show the permission level required to run each command.`,{title:'Modmail commands',controls});
+  }
+  async dispatch(ctx, command) {
+    const steps = command.steps || [command];
+    // Check every command before the first side effect; recheck each during execution.
+    for (const step of steps) {
+      authorize(step.name,ctx.level,this.config,this.plugins);
+      if (['snippet','alias'].includes(step.name) && ['add','set','delete'].includes(firstArg(step.args)[0]) && ctx.level < 3) throw new Error('Editing canned replies and aliases requires permission level 3.');
+      if (step.name === 'close') {
+        requireTicket(ctx.ticket);
+        const [delay] = firstArg(step.args);
+        if (delay && delay !== 'now') parseDuration(delay);
+      }
+    }
+    for (const [index, step] of steps.entries()) {
+      const message = index ? { id: `${ctx.message.id}:${index}`, channelId: ctx.message.channelId, author: ctx.message.author, member: ctx.message.member, attachments: new Map(), createdTimestamp: ctx.message.createdTimestamp } : ctx.message;
+      const stepCtx = { ...ctx, message, commandSourceId: ctx.message.id };
+      await this.execute(stepCtx,step.name,step.args);
+    }
+  }
+  async sendReply(ctx, ticket, text, options) {
+    return this.inbox.reply(ticket,ctx.message,text,false,{...options,removeSource:true,commandSourceId:ctx.commandSourceId || ctx.message.id});
   }
   async execute(ctx,name,args='') {
     authorize(name,ctx.level,this.config,this.plugins);
@@ -56,7 +79,7 @@ export class CommandRouter {
       requireTicket(ticket);
       const options={...replyOptions(name,this.config),sourceCommand:name};
       const text=options.formatted?formatVariables(args,{ticket,user:await this.transport.user(ticket.user_id),moderator:options.anonymous?{displayName:'Moderation team'}:ctx.member,guild:await this.transport.guild()}):args;
-      await this.inbox.reply(ticket,message,text,false,options);return;
+      await this.sendReply(ctx,ticket,text,options);return;
     }
     switch(name) {
       case 'help':return this.help(ctx,args);
@@ -68,11 +91,11 @@ export class CommandRouter {
         const userId=idFrom(first);if(!userId)throw new Error('Provide a member ID or mention.');
         const user=await this.transport.user(userId);if(user.bot)throw new Error('Cannot contact a bot.');
         const created=await this.inbox.contact(user,actor);
-        if(rest)await this.inbox.reply(created,message,rest,false,{anonymous:this.config.alwaysAnonymous,plain:false});
+        if(rest)await this.sendReply(ctx,created,rest,{anonymous:this.config.alwaysAnonymous,plain:false});
         return respond(`Conversation #${created.id}: https://discord.com/channels/${this.config.guildId}/${created.channel_id}`);
       }
       case 'note':requireTicket(ticket);return this.inbox.reply(ticket,message,args,true,{anonymous:false,plain:false});
-      case 'edit':requireTicket(ticket);if(!rest)throw new Error('Provide a message ID and new text.');await this.inbox.commandEdit(ticket,first,rest,actor);return respond('Updated the delivered copies and audit log. Original staff command text is unchanged.');
+      case 'edit':requireTicket(ticket);if(!rest)throw new Error('Provide a message ID and new text.');await this.inbox.commandEdit(ticket,first,rest,actor);return respond('Updated the delivered copies and audit log.');
       case 'delete':requireTicket(ticket);await this.inbox.commandDelete(ticket,first,actor);return respond('Deleted the delivered copies. Content remains in the private audit log.');
       case 'retry':requireTicket(ticket);await this.inbox.retry(ticket,first);return respond('Synchronization completed.');
       case 'close': {
@@ -127,15 +150,15 @@ export class CommandRouter {
       case 'snippet':case 'snippets':case 'alias':case 'aliases': {
         const key=name.startsWith('snippet')?'snippets':'aliases';
         if(name===key || !first || first==='list')return respond(Object.entries(this.config[key]).map(([n,v])=>`${n}: ${v}`).join('\n') || `No ${key} configured.`);
-        if(first==='set' || first==='delete') {
+        if(first==='add' || first==='set' || first==='delete') {
           if(ctx.level<3)throw new Error('Editing canned replies and aliases requires permission level 3.');
-          const [keyName,value]=firstArg(rest);if(!keyName || first==='set' && !value)throw new Error('Provide a name and value.');
+          const [keyName,value]=firstArg(rest);if(!keyName || first!=='delete' && !value)throw new Error('Provide a name and value.');
           if(key==='aliases' && this.plugins?.command(keyName))throw new Error('Alias conflicts with a plugin command.');
           const updated={...this.config[key]};if(first==='delete')delete updated[keyName];else Object.defineProperty(updated,keyName,{value,enumerable:true,configurable:true,writable:true});
           this.set(key,updated);return respond(`${key} updated.`);
         }
-        if(key==='aliases')throw new Error('Use alias set, delete, or list.');
-        requireTicket(ticket);if(!Object.hasOwn(this.config.snippets,first))throw new Error('Unknown snippet.');return this.inbox.reply(ticket,message,this.config.snippets[first],false,{anonymous:true,plain:false});
+        if(key==='aliases')throw new Error('Use alias add, set, delete, or list.');
+        requireTicket(ticket);if(!Object.hasOwn(this.config.snippets,first))throw new Error('Unknown snippet.');return this.sendReply(ctx,ticket,this.config.snippets[first],{anonymous:true,plain:false,sourceCommand:'snippet'});
       }
       case 'block':case 'unblock': {
         const role=/^<@&(\d{17,20})>$/.exec(first),id=role?.[1] || idFrom(first);if(!id)throw new Error('Provide a user ID or role mention.');
@@ -195,15 +218,22 @@ export class CommandRouter {
         return respond(`Plugin ${rest}: ${first} complete.`);
       }
       case 'update': {
-        if(first && first!=='check')throw new Error('Use update check. Deploy updates from the host using the displayed command.');
-        const response=await fetch('https://api.github.com/repos/Dev-Aaron27/AaronsSupport/releases/latest',{headers:{Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(10000)});
-        const release=response.ok?await response.json():null;
-        if(!response.ok && response.status!==404)throw new Error('Unable to check releases. Try again later.');
-        return respond(`${release?`Latest published release: ${release.tag_name}`:'No release has been published yet.'}\nBack up your data, review release notes, and update the host checkout. Then run:\ndocker compose up -d --build\nThis command does not modify or restart the running container.`);
+        if(first && first!=='check')throw new Error('Use update or update check.');
+        const updater=this.updater || new AppUpdater(process.cwd());
+        if(first==='check') {
+          const revision=await updater.latest(),current=this.updater?await updater.current():null;
+          return respond(`GitHub main: ${revision.slice(0,12)}\nInstalled: ${current?.slice(0,12) || 'bundled/local source'}\n${this.updater?'Use '+this.config.prefix+'update to install, then restart from the panel.':'Update your checkout and rebuild the Docker image or restart your Node process.'}`);
+        }
+        if(!this.updater)throw new Error('Automatic installation is available on managed Pterodactyl servers. For Docker, update your checkout and run docker compose up -d --build.');
+        await respond('Downloading and checking the update. The current bot keeps running until you restart.');
+        try {
+          const result=await this.updater.apply();
+          return respond(result.changed?`Installed GitHub revision ${result.revision.slice(0,12)}. Restart the server from the panel to activate it. Configuration, data and plugins were preserved; the previous app is in app.previous/.`:'The latest GitHub revision is already installed.');
+        } catch(error) { this.transport.report(error,'update');throw new Error(error.code?'Update failed. Check disk space and file permissions in the panel.':error.message); }
       }
       default: {
         const plugin=this.plugins?.command(name);if(!plugin)throw new Error(`Unknown command. Use ${this.config.prefix}help.`);
-        return plugin.execute(Object.freeze({args,actorId:actor,level:ctx.level,ticket:ticket?structuredClone(ticket):null,respond:(text)=>respond(String(text)),reply:(text)=>{requireTicket(ticket);return this.inbox.reply(ticket,message,String(text),false,{anonymous:true,plain:false});}}));
+        return plugin.execute(Object.freeze({args,actorId:actor,level:ctx.level,ticket:ticket?structuredClone(ticket):null,respond:(text)=>respond(String(text)),reply:(text)=>{requireTicket(ticket);return this.sendReply(ctx,ticket,String(text),{anonymous:true,plain:false});}}));
       }
     }
   }

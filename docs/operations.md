@@ -40,13 +40,37 @@ Message delivery records track each recipient and split component message separa
 
 ## Updates
 
-`.update check` reads the latest published release metadata and provides host deployment instructions. It does not pull code or restart itself from chat. Review release notes, back up the data, update your checkout on the host, and rebuild:
+On Pterodactyl, `.update check` shows the latest commit on the public GitHub repository’s `main` branch. `.update` downloads that revision, checks the source, installs locked dependencies, and replaces the managed `app/` directory. Then restart the server from the panel to activate it. No new egg is required for routine source updates.
+
+The repository must be public and the complete bot source must be uploaded to `main` first. Updates are pinned to the commit returned by GitHub. They need outbound access to GitHub and npm, and enough disk for the new dependencies and the previous app. The currently running process continues using the old code until restart; further updates are blocked until that restart.
+
+Your top-level `config.json`, `data/`, and `plugins/` are preserved. The previous application is kept in `app.previous/`. A download, syntax, or dependency-install failure leaves the current `app/` in place. To recover an interrupted directory replacement with the bot stopped, restore `app.previous/` as `app/` if `app/` is missing. Changes inside `app/` are replaced by updates. Back up data before upgrading; after startup, code rollback does not roll back database migrations.
+
+Install this updater once using the current egg or source download. Older bots whose `.update` only checks release notes need that initial upgrade. Egg changes are still needed when startup variables or container requirements change.
+
+For Docker and ordinary Node hosting, update your checkout on the host. Rebuild Docker with:
 
 ```sh
 docker compose up -d --build
 ```
 
 Schema additions migrate existing version 1 data automatically. Back up before upgrading; rolling back application code is not a database downgrade procedure. Use `.changelog` for the summary and `.debug` for recent sanitized operational events. Exception bodies, tokens, and DM content are not included in debug output.
+
+## Uploading a source ZIP to GitHub
+
+Extract the source ZIP on your computer. Upload its files and folders directly to the repository root, replacing the existing files. You should see `package.json`, `src/`, `scripts/`, `deploy/` and `test/` together on the repository’s main page.
+
+Do not upload an enclosing `AaronsSupport/` folder or the ZIP file itself. If you already uploaded that folder, replace the root files with its updated contents, then delete the extra `AaronsSupport/` directory and commit the correction. Keep your configuration, databases, logs and secrets on the bot host.
+
+Wait for the Checks workflow to pass before updating the bot. `.update` downloads source from the repository root; files under an extra project folder are not the active application. If your installed bot is too old for `.update`, install the current egg once.
+
+## Console and operational logs
+
+Startup prints a purple banner followed by the runtime versions, bot and server identity, active prefix, staff roles, plugin loading, log viewer status, and pending closures. Wait for `Ready: moderator inbox for server ...` before using commands. An incomplete setup prints the command needed to finish it.
+
+Commands log their name, user/channel IDs, completion and failures. Message bodies, command arguments, raw Discord request objects and credentials are excluded. Errors such as missing permissions, blocked DMs, invalid tokens and disallowed intents have readable explanations. Gateway reconnects and shutdown are logged too.
+
+The same entries are saved without color in `data/logs/modmail.log` (under your configured `DATA_DIR`). Files rotate at 5 MiB, retaining three previous files. Restrict access to these logs because they include server, user and channel IDs. Set `LOG_COLOR=false` or `NO_COLOR=1` in the host environment for plain console output.
 
 ## Known limits
 

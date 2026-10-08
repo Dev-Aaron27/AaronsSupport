@@ -56,7 +56,7 @@ The default site address is `https://dev-aaron27.github.io/AaronsSupport/`. GitH
 
 ## Pterodactyl egg
 
-The egg includes a source bundle and installs the locked dependencies. Rebuild it whenever changing bundled application code, example configuration, README, contributor guide, or Markdown documentation:
+The egg includes a source bundle and installs the locked dependencies. Rebuild it whenever changing bundled application code, package manifests, example configuration, installer, or egg template:
 
 ```sh
 npm run pterodactyl:build
@@ -64,9 +64,13 @@ npm run pterodactyl:build
 
 Packaging requires Node.js 24 and GNU tar. Commit `deploy/pterodactyl/egg-aarons-support.json` and `deploy/pterodactyl/SHA256SUMS` together with the source change. The separate generated application archive is ignored by Git.
 
-The bundle uses an explicit file allowlist. It excludes live configuration, environment files, conversation data, installed dependencies, and custom plugins. CI regenerates the egg and rejects a mismatch.
+The runtime bundle uses an explicit file allowlist and omits documentation. The builder rejects installation scripts larger than 65,535 bytes, the limit of Pterodactyl’s database column. `egg-template.json` is a build input; import only `egg-aarons-support.json`. It excludes live configuration, environment files, conversation data, installed dependencies, and custom plugins. CI regenerates the egg and rejects a mismatch.
 
 Run `npm run pterodactyl:build` before `npm run docs:build` when checking the downloadable egg on the docs site.
+
+## Manual source uploads
+
+The repository root must contain `package.json`, `src/`, `scripts/`, `deploy/` and `test/`. Extract a source archive and upload these entries directly to that root. Remove any duplicate project directory such as `AaronsSupport/` after moving its updated files into place. Nested copies make Node discover both test suites, while relative build and startup paths can still select the old root files.
 
 ## Pull requests
 

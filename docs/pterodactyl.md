@@ -13,7 +13,7 @@ The runtime uses **ghcr.io/parkervcp/yolks:nodejs_24**, and the installer uses *
 3. Start with **512 MiB RAM**, **1 CPU core**, and **2 GiB disk**. Increase disk and RAM for large inboxes/archives. Use no swap unless your host requires it. These are suggested starting allocations, not measured capacity guarantees.
 4. Assign a primary allocation; Pterodactyl requires one even when the bot does not listen on a port. The allocation is only used if you enable the optional private log viewer.
 5. Fill in the three required Startup variables: **Discord Bot Token**, **Discord Server ID**, and **Staff Role IDs**. Role lists accept comma-separated IDs.
-6. Wait for installation to finish, then start the server. A ready bot prints `Ready: moderator inbox for server ...` and the panel marks it running.
+6. Leave **Skip Egg Install Script** unchecked. Wait for installation to finish, then start the server. A ready bot prints `Ready: moderator inbox for server ...` and the panel marks it running.
 7. With category/log variables blank, run `.setup` in Discord as the server owner or a configured bot owner. It creates the private category and log channel. You can then start handling DMs.
 
 Enable Message Content Intent and give the bot the permissions in the [Discord setup guide](setup.md). The default command prefix is **`.`**.
@@ -60,7 +60,7 @@ Administrators and users who can view Startup variables may see tokens. Restrict
 
 Wings mounts this same server volume at `/mnt/server` during installation. The installer adopts the server directory's ownership rather than hard-coding a user ID. Existing data, config, `.env`, and custom plugins are preserved on reinstall. Dependencies and application code are prepared before replacing app/. The installer refuses to replace an existing app/ without its ownership marker, so another application's folder is not silently overwritten.
 
-Use the **Reinstall** action with an updated egg to install a newer bundled version. Back up first. Importing a newer egg does not update existing server files by itself. If your panel imports it as a new egg, select that egg for the server before reinstalling. Keep the startup command and image aligned with the selected egg. Do not upload edits inside app/ that you need to retain; keep plugins in the top-level plugins/ directory.
+For routine source updates, run `.update` in the private log channel, then restart from the panel. Publish the complete source to the public GitHub `main` branch first. See [updates](operations.md#updates). Use the **Reinstall** action with an updated egg when changing egg settings or installing a bundled version. Back up first. Importing a newer egg does not update existing server files by itself. If your panel imports it as a new egg, select that egg for the server before reinstalling. Keep the startup command and image aligned with the selected egg. Do not upload edits inside app/ that you need to retain; keep plugins in the top-level plugins/ directory.
 
 ## Optional OAuth log viewer
 
@@ -78,9 +78,12 @@ Archives currently store absolute local paths. If migrating from Docker's `/app/
 
 ## Troubleshooting
 
+- **No files after creating a server:** confirm the server uses `egg-aarons-support.json`, not `egg-template.json`. In the Admin area, make sure **Skip Egg Install Script** is unchecked. Import the latest egg, select it for this server, then use **Reinstall** and wait for installation to finish. You should see `app/`, `data/`, and `plugins/`; `config.json` is created on first start. If the folders are still missing, ask your host for the Wings installation log (not just the startup console).
+- **Older egg fails to import or installation script is empty:** download the latest egg. Earlier packages exceeded Pterodactyl’s installation-script storage limit. Updating the egg and reinstalling is required; restarting alone does not install files.
 - **Installation cannot download dependencies:** allow outbound access to the npm registry and the selected image registries, then retry installation. A failed dependency install leaves the existing app/ in place.
 - **Set guildId/staffRoleIds errors:** copy numeric Discord IDs, not names or mentions. The everyone role cannot be a staff role.
 - **Missing Message Content intent:** enable it in the Discord Developer Portal and restart.
+- **Commands do nothing:** wait for the ready line, check the prefix printed at startup, then watch for `Received` and `Completed` command lines. Management commands need a private staff channel; replies need a ticket. Check `data/logs/modmail.log` for permission or response failures.
 - **Bot stays starting:** read its console. It reports ready only after Discord login and permission checks complete. Repair private category/log permissions or clear the optional IDs and use `.setup`.
 - **File permission errors:** check the server volume's ownership in Wings. The runtime user must be able to write config.json, data/, and plugins/.
 - **Viewer missing allocation/OAuth errors:** use a valid primary allocation, complete both OAuth variables, and configure HTTPS forwarding; or leave LOG_VIEWER_URL blank.

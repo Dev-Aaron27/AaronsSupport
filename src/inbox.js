@@ -75,7 +75,7 @@ export class Inbox {
     if (!content && !source.attachments.size) throw new Error('Send text or attach a file. Stickers, polls, voice playback, and reactions are not relayed.');
     const attachments = await this.archives.saveAttachments(ticket.id, source.attachments, this.config.maxAttachmentBytes);
     const members = this.store.participants(ticket.id).map(p => p.user_id);
-    const recipients = direction === 'note' ? ['staff'] : direction === 'staff' ? members : ['staff', ...members.filter(id => id !== source.author.id)];
+    const recipients = direction === 'note' ? ['staff'] : direction === 'staff' ? ['staff', ...members] : ['staff', ...members.filter(id => id !== source.author.id)];
     const row = this.store.addMessage(ticket, source, direction, content, attachments, options, recipients);
     if (direction === 'member' && (ticket.snoozed_at || ticket.status === 'broken')) {
       this.store.updateMessage(row.id, { delivery: 'queued' });
@@ -109,8 +109,23 @@ export class Inbox {
         } catch (error) { errors.push(error); break; }
       }
     }
+    if (row.direction === 'member' && this.store.copies(row.id).filter(c => c.destination === 'staff').length === parts.length) {
+      await this.transport.acknowledge?.(row).catch(error => this.transport.report(error, 'delivery reaction'));
+    }
     if (errors.length) throw new AggregateError(errors, 'Some recipients could not be reached.');
     this.store.updateMessage(row.id, { delivery: row.direction === 'note' ? 'internal' : 'sent' });
+    if (row.options.removeSource && !row.options.sourceRemoved && this.transport.deleteSource) {
+      const options = { ...row.options, sourceRemoved: true };
+      const origin = this.store.message(row.options.commandSourceId || row.source_id);
+      this.store.updateMessage(row.id, { options: JSON.stringify(options) });
+      if (origin && origin.id !== row.id) this.store.updateMessage(origin.id, { options: JSON.stringify({ ...origin.options, sourceRemoved: true }) });
+      try { await this.transport.deleteSource(row); }
+      catch (error) {
+        this.store.updateMessage(row.id, { options: JSON.stringify({ ...options, sourceRemoved: false }) });
+        if (origin && origin.id !== row.id) this.store.updateMessage(origin.id, { options: JSON.stringify(origin.options) });
+        this.transport.report(error, 'reply command cleanup');
+      }
+    }
   }
   async notify(ticket) {
     for (const notification of this.store.notifications(ticket.id)) {
@@ -165,9 +180,9 @@ export class Inbox {
       throw error;
     }
   }
-  delete(sourceId) {
+  delete(sourceId, force = false) {
     const found = this.store.message(sourceId);
-    if (!found) return;
+    if (!found || !force && found.options.sourceRemoved) return;
     const ticket = this.store.ticket(found.ticket_id);
     return this.queue.run(ticket.user_id, async () => {
       const row = this.store.message(sourceId);
@@ -190,7 +205,7 @@ export class Inbox {
   async commandDelete(ticket,id,actor) {
     const row = this.store.findMessage(ticket.id,id);
     if (!row || row.direction === 'member') throw new Error('Choose a staff reply or note in this conversation.');
-    await this.delete(row.source_id);
+    await this.delete(row.source_id, true);
     this.store.event(ticket.id,actor,`deleted message ${row.source_id}`);
     await this.transport.deleteSource?.(row).catch(() => {});
   }

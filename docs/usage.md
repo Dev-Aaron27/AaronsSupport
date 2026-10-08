@@ -2,6 +2,12 @@
 
 Once the bot is online, members can DM it to open a thread. Your configured staff roles can read and reply in the private channel it creates.
 
+## Finding commands
+
+Use `.help` to browse all commands with the Previous and Next buttons, or `.help 2` to open a specific page. Use `.help reply` for a command’s usage and required permission level. Help includes loaded plugin commands.
+
+The numbers in brackets are permission requirements: 1 member, 2 staff, 3 senior staff, 4 administrator, and 5 owner. Everyone can read help; running a command still requires its permission level. Management commands such as `.alias`, `.snippet add`, `.config` and `.update` work in any channel visible only to configured staff. Reply and conversation commands need an active inbox ticket. The bot explains missing permissions or unsuitable channels.
+
 ## Opening a thread
 
 Run `.selfcontact` in your server to open a conversation with yourself. You can also use `.contact` to start one with a member:
@@ -23,7 +29,9 @@ Send these commands inside the member’s thread:
 
 `.reply` shows your server display name. `.areply` shows “Moderation team”. Both are sent from the bot’s account.
 
-**A normal message in the staff channel is also sent to the member, anonymously.** Use `.note` for something only staff should see:
+**Normal messages in the staff channel stay there.** Only reply commands and snippets send messages to members. Use `.r` as a shortcut for `.reply`, or `.ar` for `.areply`. Successful replies are posted as Components V2 cards in the ticket and the member’s DMs; the original command is removed. Use `.edit` and `.delete` with the card’s message ID to change a reply. Member DMs get a ✅ after every part reaches staff. Queued or failed staff deliveries get no checkmark.
+
+Use `.note` to save something only staff should see in the conversation log:
 
 ```text
 .note Waiting for another moderator to review the attachment.
@@ -75,12 +83,13 @@ Use `.logs` in a thread to see that member’s history. Elsewhere in the private
 Staff with level 3 access can save common replies as snippets. Any staff member can send a saved snippet:
 
 ```text
-.snippet set received Thanks for contacting us. We’ve received your report.
+.snippet add received Thanks for contacting us. We’ve received your report.
 .snippet received
+.received
 .snippets
 ```
 
-Snippets are sent anonymously. Use `.snippet delete received` to remove one. [Aliases](configuration.md#availability-and-first-message-rules) let you make shortcuts to commands with preset arguments.
+Snippets are sent anonymously, through `.snippet name` or `.name`. Use `.snippet delete received` to remove one. [Aliases](configuration.md#availability-and-first-message-rules) let you make shortcuts to commands with preset arguments.
 
 ## Notifications and snoozing
 
@@ -106,3 +115,14 @@ With the default snooze mode, incoming messages are saved until the thread resum
 ```
 
 The anonymous variants, `.anonadduser` and `.anonremoveuser`, leave your moderator name out of the notice. A thread can have up to ten members, and a member can be in only one active thread at a time.
+
+## Chained aliases
+
+Save a sequence of commands with `&&`, then run the shortcut inside a ticket:
+
+```text
+.alias add thanks areply Thanks for contacting support. && close 1h
+.thanks
+```
+
+The reply is sent first, then the ticket is scheduled to close in one hour. All command permissions are checked before the sequence starts, and a failed command stops the remaining steps. Aliases accept up to ten built-in commands; an immediate close must be last. Use `.alias delete thanks` to remove one. `set` remains available to edit aliases and snippets.

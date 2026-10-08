@@ -35,7 +35,10 @@ export function validateConfig(input) {
   for (const key of ['snippets', 'aliases']) {
     if (!c[key] || typeof c[key] !== 'object' || Array.isArray(c[key]) || Object.entries(c[key]).some(([k, v]) => !/^[a-z][a-z0-9_-]{0,31}$/.test(k) || typeof v !== 'string' || !v || v.length > 4000)) throw new Error(`${key} must map short lowercase names to nonempty text (max 4000).`);
   }
-  for (const [alias, target] of Object.entries(c.aliases)) if (Object.hasOwn(commands, alias) || !Object.hasOwn(commands, target.split(/\s+/)[0])) throw new Error('Aliases must use a new name and target a built-in command (with optional preset arguments).');
+  for (const [alias, target] of Object.entries(c.aliases)) {
+    if (Object.hasOwn(commands, alias)) throw new Error('Aliases must use a new command name.');
+    aliasSteps(target);
+  }
   if (!Array.isArray(c.ownerUserIds) || c.ownerUserIds.some(id => typeof id !== 'string' || !snowflake.test(id))) throw new Error('ownerUserIds must contain user IDs.');
   for (const key of ['permissionRoles', 'commandLevels']) {
     if (!c[key] || typeof c[key] !== 'object' || Array.isArray(c[key])) throw new Error(`${key} must be an object.`);
@@ -59,16 +62,30 @@ export function validateConfig(input) {
 export function readConfig(path, overrides = {}) { return validateConfig({ ...JSON.parse(readFileSync(path, 'utf8')), ...overrides }); }
 export const runtimeKeys = new Set(['prefix', 'status', 'statusType', 'colors', 'minAccountAgeHours', 'minMemberAgeHours', 'messageCooldownSeconds', 'snippets', 'aliases', 'welcomeMessage', 'closeMessage', 'snoozeMode', 'presenceStatus', 'alwaysAnonymous']);
 
+const shorthand = { r: 'reply', ar: 'areply' };
+const commandParts = text => {
+  const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(text.trim());
+  const name = (match?.[1] || '').toLowerCase();
+  return { name: shorthand[name] || name, args: match?.[2] || '' };
+};
+export function aliasSteps(value) {
+  const steps = value.split('&&').map(commandParts);
+  if (steps.length > 10 || steps.some(step => !Object.hasOwn(commands, step.name))) throw new Error('Aliases need 1–10 built-in commands separated by &&.');
+  if (steps.some((step, i) => step.name === 'close' && (!step.args || step.args.startsWith('now')) && i < steps.length - 1)) throw new Error('An immediate close must be the last alias command.');
+  return steps;
+}
 export function parseCommand(content, config) {
   if (!content.startsWith(config.prefix)) return null;
-  const match = /^(\S+)(?:\s([\s\S]*))?$/.exec(content.slice(config.prefix.length).trim());
-  const name = (match?.[1] || '').toLowerCase();
-  const args = match?.[2] || '';
-  if (Object.hasOwn(config.aliases, name)) {
-    const [target, ...preset] = config.aliases[name].split(/\s+/);
-    return { name: target, args: [preset.join(' '), args].filter(Boolean).join(' ') };
+  const parsed = commandParts(content.slice(config.prefix.length));
+  // Resolve configured shortcuts by their original name (including r/ar overrides).
+  const original = content.slice(config.prefix.length).trim().split(/\s+/)[0].toLowerCase();
+  if (!Object.hasOwn(config.aliases, original)) {
+    if (!Object.hasOwn(commands, parsed.name) && Object.hasOwn(config.snippets, original)) return { name: 'snippet', args: original };
+    return parsed;
   }
-  return { name, args };
+  const steps = aliasSteps(config.aliases[original]);
+  steps[0].args = [steps[0].args, parsed.args].filter(Boolean).join(' ');
+  return steps.length === 1 ? steps[0] : { ...steps[0], steps };
 }
 
 export function parseDuration(value) {

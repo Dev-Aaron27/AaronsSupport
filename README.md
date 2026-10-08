@@ -68,7 +68,7 @@ Once the bot is online, run `.setup` as the server owner. See the [installation 
 | `.logs [member ID]` | Look up a member’s conversations |
 | `.help [command]` | Browse commands or check their usage |
 
-**Ordinary messages in a staff thread are sent to the member as anonymous replies.** Use `.note` for staff-only discussion. Scheduled closes stay active until you use `.cancelclose`.
+**Only reply commands and snippets send messages to members.** Ordinary staff messages stay in the channel. Use `.note` to save staff-only discussion in the conversation log. Scheduled closes stay active until you use `.cancelclose`.
 
 The [usage guide](docs/usage.md) covers replies, attachments, snippets, participants, and notifications.
 

@@ -1,8 +1,0 @@
-.git
-node_modules
-.env
-data
-config.json
-coverage
-_site
-docs

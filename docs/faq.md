@@ -10,11 +10,13 @@ Run `.isenable` to check availability. Check `.blocked` and the `minAccountAgeHo
 
 Put the correct role IDs in `staffRoleIds`, or in Pterodactyl’s **Staff Role IDs** variable. Staff default to permission level 2. Use `.permissions` to inspect your level and command overrides.
 
-Most commands belong inside the private thread or log channel. Setup and informational commands can be used elsewhere. See [permission levels](configuration.md#permission-levels).
+Management commands work in any private channel whose access is limited to configured staff. Replies need an active ticket. Public channels receive a direction to use a private channel; missing command permissions produce an explanation. Setup and informational commands can be used elsewhere. See [permission levels](configuration.md#permission-levels).
+
+If nothing appears at all, check the console for `Ready: moderator inbox`, the active prefix, and a `Received` command line. If the command is received but the response cannot be sent, the console reports the Discord error. `50013` means missing permissions. A privileged-intent failure means Message Content Intent must be enabled in the Discord Developer Portal.
 
 ## How do I keep a message staff-only?
 
-Use `.note your message`. Ordinary messages in a modmail channel are sent to the member as anonymous replies.
+Ordinary messages in a modmail channel stay with staff. Use `.note your message` to also save an internal note in the conversation log. Only reply commands and snippets send text to members.
 
 ## What happens to mentions?
 

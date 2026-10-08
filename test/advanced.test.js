@@ -9,7 +9,7 @@ import { Store } from '../src/store.js';
 import { validateConfig,parseCommand } from '../src/config.js';
 import { levelFor,authorize } from '../src/permissions.js';
 import { panel,stripPings,formatVariables } from '../src/ui.js';
-import { replyOptions } from '../src/catalog.js';
+import { commands, replyOptions } from '../src/catalog.js';
 import { Plugins } from '../src/plugins.js';
 import { CommandRouter } from '../src/commands.js';
 const ids={guildId:'100000000000000001',categoryId:'100000000000000002',logChannelId:'100000000000000003',staffRoleIds:['100000000000000004']};
@@ -90,4 +90,66 @@ test('closure state and participant release are atomic',async t=>{
   const release=store.releaseParticipants.bind(store);store.releaseParticipants=()=>{throw new Error('simulated failure');};assert.throws(()=>store.finishTicket(ticket.id),/simulated/);
   assert.equal(store.ticket(ticket.id).status,'closing');assert.equal(store.participants(ticket.id).length,1);
   store.releaseParticipants=release;store.finishTicket(ticket.id);assert.equal(store.ticket(ticket.id).status,'closed');assert.equal(store.participants(ticket.id).length,0);assert.ok(store.createTicket('member'));
+});
+
+
+test('help exposes the full catalog and plugin usage at member level while execution stays restricted', async () => {
+  const cfg=config();cfg.prefix='!';cfg.commandLevels={close:4};
+  const spec={level:3,description:'Example plugin command.',usage:'<value>',execute(){throw new Error('Must not execute');}};
+  const plugins={registry:new Map([['samplecmd',spec]]),command:name=>name==='samplecmd'?spec:undefined};
+  const router=new CommandRouter({config:cfg},{},{},plugins);
+  const responses=[],ctx={level:1,message:{author:{id:'member'}},respond:async(text,options)=>responses.push({text,options})};
+  const total=Object.keys(commands).length+1,pages=Math.ceil(total/10);
+  for(let page=1;page<=pages;page++) {
+    await router.execute(ctx,'help',page===1?'':String(page));
+    const response=responses.at(-1);
+    assert.ok(response.text.includes(`Page ${page} of ${pages}`));
+    assert.ok(!response.text.includes('—'));
+    assert.deepEqual(response.options.controls.map(c=>c.custom_id),[
+      ...(page>1?[`help:member:${page-1}`]:[]),...(page<pages?[`help:member:${page+1}`]:[]),
+    ]);
+  }
+  const listing=responses.map(r=>r.text).join('\n');
+  const listed=[...listing.matchAll(/\*\*\[\d\] !([a-z]+)\*\*:/g)].map(m=>m[1]);
+  assert.deepEqual(listed,[...Object.keys(commands),'samplecmd']);
+  assert.ok(listing.includes('**[4] !close**:'));
+  await router.execute(ctx,'help','close');assert.match(responses.at(-1).text,/Usage: !close/);assert.match(responses.at(-1).text,/Permission level: 4/);
+  await router.execute(ctx,'help','samplecmd');assert.match(responses.at(-1).text,/Usage: !samplecmd <value>/);
+  await assert.rejects(router.execute(ctx,'close'),/permission level 4/);
+  await assert.rejects(router.execute(ctx,'plugins'),/permission level 5/);
+  await assert.rejects(router.execute(ctx,'samplecmd'),/permission level 3/);
+});
+
+
+test('alias add chains anonymous reply then timed close, checks every permission first and stops on failure', async t => {
+  const dir=await temp(t),store=new Store(dir);t.after(()=>store.close());const cfg=config(),calls=[];
+  const inbox={config:cfg,reply:async(_ticket,message,text,_note,options)=>{calls.push(['reply',message.id,text,options]);},schedule:async(_ticket,delay)=>{calls.push(['schedule',delay]);return {close_at:Date.now()+delay};}};
+  const router=new CommandRouter(inbox,{},store),ctx={level:3,ticket:{id:1},message:{id:'123',channelId:'staff',author:{id:'mod'},attachments:new Map()},respond:async()=>{}};
+  await router.execute(ctx,'alias','add thanks areply Thanks for contacting support. && close 1h');
+  assert.equal(store.settings().aliases.thanks,cfg.aliases.thanks);
+  await router.dispatch(ctx,parseCommand('.thanks',cfg));assert.equal(calls[0][2],'Thanks for contacting support.');assert.equal(calls[0][3].anonymous,true);assert.equal(calls[0][3].removeSource,true);assert.deepEqual(calls[1],['schedule',3600000]);
+  calls.length=0;cfg.commandLevels.close=4;await assert.rejects(router.dispatch(ctx,parseCommand('.thanks',cfg)),/level 4/);assert.equal(calls.length,0);
+  cfg.commandLevels={};inbox.reply=async()=>{throw new Error('DM failed');};await assert.rejects(router.dispatch(ctx,parseCommand('.thanks',cfg)),/DM failed/);assert.equal(calls.length,0);
+  cfg.aliases.test='areply hello && close invalid';await assert.rejects(router.dispatch(ctx,parseCommand('.test',cfg)),/duration/);assert.equal(calls.length,0);
+  assert.throws(()=>validateConfig({...config(),aliases:{bad:'areply hi && unknown'}}),/built-in/);
+  assert.throws(()=>validateConfig({...config(),aliases:{bad:'close now && areply hi'}}),/last/);
+});
+
+test('snippet add persists and both snippet invocation forms send anonymous cards; r/ar remain shortcuts',async t=>{
+  const dir=await temp(t),store=new Store(dir);t.after(()=>store.close());const cfg=config();let sent;
+  const router=new CommandRouter({config:cfg,reply:async(...args)=>{sent=args;}},{},store);
+  const ctx={level:3,ticket:{id:1},message:{id:'123',author:{id:'mod'},attachments:new Map()},respond:async()=>{}};
+  await router.execute(ctx,'snippet','add received Thanks for contacting support.');assert.equal(store.settings().snippets.received,'Thanks for contacting support.');
+  for(const text of ['.received','.snippet received']) {await router.dispatch({...ctx,level:2},parseCommand(text,cfg));assert.equal(sent[2],'Thanks for contacting support.');assert.equal(sent[4].anonymous,true);assert.equal(sent[4].removeSource,true);}
+  assert.deepEqual(parseCommand('.ar hi',cfg),{name:'areply',args:'hi'});assert.deepEqual(parseCommand('.r hi',cfg),{name:'reply',args:'hi'});
+  await assert.rejects(router.execute({...ctx,level:2},'snippet','add bad nope'),/level 3/);
+});
+
+
+test('update installs only for owners on managed hosts and tells them to restart',async()=>{
+  const responses=[],router=new CommandRouter({config:config()},{report:()=>{}},{}),ctx={level:5,message:{author:{id:'owner'}},respond:async text=>responses.push(text)};let applied=0;
+  router.updater={apply:async()=>{applied++;return {revision:'a'.repeat(40),changed:true};},latest:async()=> 'a'.repeat(40),current:async()=>null};
+  await assert.rejects(router.execute({...ctx,level:4},'update'),/level 5/);assert.equal(applied,0);
+  await router.execute(ctx,'update','check');assert.equal(applied,0);assert.match(responses.at(-1),/GitHub main/);
+  await router.execute(ctx,'update');assert.equal(applied,1);assert.match(responses.at(-1),/Restart the server from the panel/);
 });
