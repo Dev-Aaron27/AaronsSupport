@@ -1,0 +1,29 @@
+services:
+  modmail:
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      CONFIG_PATH: /app/config.json
+      DATA_DIR: /app/data
+      PLUGIN_DIR: /app/plugins
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - inbox-data:/app/data
+      - ./plugins:/app/plugins:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+volumes:
+  inbox-data:

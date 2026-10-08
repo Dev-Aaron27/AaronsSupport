@@ -1,0 +1,21 @@
+{
+  "name": "aarons-support",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A self-hosted, private Discord moderator inbox",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.js",
+    "test": "node --test",
+    "check": "node scripts/check.js",
+    "docs:build": "node scripts/build-docs.js",
+    "pterodactyl:build": "node scripts/build-pterodactyl.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.22.1",
+    "fflate": "^0.8.2"
+  }
+}
