@@ -56,6 +56,14 @@ docker compose up -d --build
 
 Schema additions migrate existing version 1 data automatically. Back up before upgrading; rolling back application code is not a database downgrade procedure. Use `.changelog` for the summary and `.debug` for recent sanitized operational events. Exception bodies, tokens, and DM content are not included in debug output.
 
+## Console and operational logs
+
+Startup prints a purple banner followed by the runtime versions, bot and server identity, active prefix, staff roles, plugin loading, log viewer status, and pending closures. Wait for `Ready: moderator inbox for server ...` before using commands. An incomplete setup prints the command needed to finish it.
+
+Commands log their name, user/channel IDs, completion and failures. Message bodies, command arguments, raw Discord request objects and credentials are excluded. Errors such as missing permissions, blocked DMs, invalid tokens and disallowed intents have readable explanations. Gateway reconnects and shutdown are logged too.
+
+The same entries are saved without color in `data/logs/modmail.log` (under your configured `DATA_DIR`). Files rotate at 5 MiB, retaining three previous files. Restrict access to these logs because they include server, user and channel IDs. Set `LOG_COLOR=false` or `NO_COLOR=1` in the host environment for plain console output.
+
 ## Known limits
 
 - One server and one running process per bot token/data directory.

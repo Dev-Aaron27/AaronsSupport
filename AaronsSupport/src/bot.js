@@ -1,10 +1,12 @@
 import { ActivityType, ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { panel, sendPanels, button, stripPings } from './ui.js';
+import { log, safeError } from './logging.js';
 import { levelFor, staffRoles } from './permissions.js';
 export { installHandlers } from './handlers.js';
 
 export class DiscordTransport {
-  constructor(client, config, store) { Object.assign(this,{client,config,store}); }
+  constructor(client, config, store, logger = log) { Object.assign(this,{client,config,store,logger}); }
+  info(context,message) { this.logger.info(context,message); }
   async guild() { return this.client.guilds.fetch(this.config.guildId); }
   user(id) { return this.client.users.fetch(id); }
   async member(id) {
@@ -129,9 +131,9 @@ export class DiscordTransport {
   async setTitle(ticket,title) {if(!title || title.length>90) throw new Error('Title must have 1–90 characters.');return (await this.channel(ticket.channel_id)).setName(title);}
   async setNsfw(ticket,value) {return (await this.channel(ticket.channel_id)).setNSFW(value);}
   report(error,context) {
-    // Diagnostic command reads only these sanitized categories/codes, never exception bodies.
-    const summary=`${context}: ${error.name || 'Error'}${error.code ? ` (${error.code})` : ''}`;
-    console.error(summary);
+    // Only known operational hints are logged, never raw API errors or message bodies.
+    const summary=`${context}: ${safeError(error)}`;
+    this.logger.error(context,error);
     this.store?.event(null,'system',summary.slice(0,300));
   }
 }

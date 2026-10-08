@@ -72,7 +72,7 @@ test('gateway handlers serialize immediate edit/delete behind the original DM an
   assert.deepEqual(calls, ['create', 'edit', 'delete']);
 });
 
-test('staff commands are ignored outside private configured channels and require current roles', async () => {
+test('ordinary staff chat stays local and explicit reply commands require current roles', async () => {
   const client = new EventEmitter();
   let allowed = false;
   let replies = 0;
@@ -125,4 +125,41 @@ test('member acknowledgement reacts on the original DM with a checkmark',async()
   let channelId,messageId,reaction;
   const transport=new DiscordTransport({},config);transport.channel=async id=>{channelId=id;return {messages:{fetch:async id=>{messageId=id;return {react:async emoji=>{reaction=emoji;}};}}};};
   await transport.acknowledge({source_channel:'dm',source_id:'message'});assert.equal(channelId,'dm');assert.equal(messageId,'message');assert.equal(reaction,'✅');
+});
+
+
+test('management commands work in other private staff channels and explain denied locations and permissions',async()=>{
+  const cfg=validateConfig({...config}),client=new EventEmitter(),responses=[],logs=[],settings=[];
+  let level=3,privateChannel=true;
+  const transport={member:async()=>({}),level:()=>level,assertPrivate:async()=>{if(!privateChannel)throw new Error('Public channel');},info:(scope,text)=>logs.push(text),report:()=>{}};
+  const store={byChannel:()=>null,setSetting:(key,value)=>settings.push([key,value])};
+  const inbox={config:cfg},handlers=installHandlers(client,inbox,transport,store);
+  const message={id:'1',guildId:cfg.guildId,channelId:'staff-commands',content:'.alias add thanks areply PRIVATE_ARGUMENT && close 1h',author:{id:'staff',bot:false},channel:{send:async payload=>{responses.push(JSON.stringify(payload));return {};}}};
+  const send=async overrides=>{handlers.start();client.emit(Events.MessageCreate,{...message,...overrides});await handlers.stop();};
+  await send();assert.equal(settings[0][0],'aliases');assert.match(responses.at(-1),/aliases updated/);assert.ok(logs.some(text=>text.includes('Completed alias')));assert.ok(!logs.join('').includes('PRIVATE_ARGUMENT'));
+  privateChannel=false;const count=settings.length;await send({content:'.alias add no areply hello'});assert.equal(settings.length,count);assert.match(responses.at(-1),/private staff channel/);
+  level=2;privateChannel=true;await send();assert.match(responses.at(-1),/requires permission level 3/);
+  await send({content:'.reply hello'});assert.match(responses.at(-1),/active inbox channel/);
+  await send({content:'.nonesuch'});assert.match(responses.at(-1),/Unknown command/);
+  await send({guildId:'different-server'});assert.match(responses.at(-1),/configured for another server/);
+});
+
+test('public alias steps cannot bypass privacy for later management commands',async()=>{
+  const cfg=validateConfig({...config,aliases:{leak:'help && config',bootstrap:'setup && config'}}),client=new EventEmitter(),responses=[];
+  let setups=0;
+  const transport={member:async()=>({}),level:()=>5,assertPrivate:async()=>{throw new Error('Public channel');},setup:async()=>{setups++;},report:()=>{}};
+  const handlers=installHandlers(client,{config:cfg},transport,{byChannel:()=>null});
+  for(const name of ['leak','bootstrap']) {
+    handlers.start();client.emit(Events.MessageCreate,{id:'1',guildId:cfg.guildId,channelId:'public',content:'.'+name,author:{id:'owner',bot:false},channel:{send:async payload=>{responses.push(JSON.stringify(payload));return {};}}});await handlers.stop();
+    assert.match(responses.at(-1),/private staff channel/);assert.ok(!responses.at(-1).includes('Editable runtime keys'));
+  }
+  assert.equal(setups,0);
+});
+
+test('command response failures produce actionable console diagnostics instead of disappearing',async()=>{
+  const client=new EventEmitter(),errors=[];
+  const transport={member:async()=>({}),level:()=>1,report:(error,context)=>errors.push([error.code,context])};
+  const handlers=installHandlers(client,{config},transport,{byChannel:()=>null});
+  handlers.start();client.emit(Events.MessageCreate,{id:'1',guildId:config.guildId,channelId:'public',content:'.config',author:{id:'member',bot:false},channel:{send:async()=>{throw Object.assign(new Error('raw sensitive request'),{code:50013});}}});await handlers.stop();
+  assert.ok(errors.some(([code,context])=>code===50013 && context.includes('could not send the error response')));
 });

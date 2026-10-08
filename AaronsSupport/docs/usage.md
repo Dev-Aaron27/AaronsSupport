@@ -6,7 +6,7 @@ Once the bot is online, members can DM it to open a thread. Your configured staf
 
 Use `.help` to browse all commands with the Previous and Next buttons, or `.help 2` to open a specific page. Use `.help reply` for a command’s usage and required permission level. Help includes loaded plugin commands.
 
-The numbers in brackets are permission requirements: 1 member, 2 staff, 3 senior staff, 4 administrator, and 5 owner. Everyone can read help; running a command still requires its permission level. Run staff commands inside a private inbox channel or the configured log channel.
+The numbers in brackets are permission requirements: 1 member, 2 staff, 3 senior staff, 4 administrator, and 5 owner. Everyone can read help; running a command still requires its permission level. Management commands such as `.alias`, `.snippet add`, `.config` and `.update` work in any channel visible only to configured staff. Reply and conversation commands need an active inbox ticket. The bot explains missing permissions or unsuitable channels.
 
 ## Opening a thread
 

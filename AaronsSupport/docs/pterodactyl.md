@@ -83,6 +83,7 @@ Archives currently store absolute local paths. If migrating from Docker's `/app/
 - **Installation cannot download dependencies:** allow outbound access to the npm registry and the selected image registries, then retry installation. A failed dependency install leaves the existing app/ in place.
 - **Set guildId/staffRoleIds errors:** copy numeric Discord IDs, not names or mentions. The everyone role cannot be a staff role.
 - **Missing Message Content intent:** enable it in the Discord Developer Portal and restart.
+- **Commands do nothing:** wait for the ready line, check the prefix printed at startup, then watch for `Received` and `Completed` command lines. Management commands need a private staff channel; replies need a ticket. Check `data/logs/modmail.log` for permission or response failures.
 - **Bot stays starting:** read its console. It reports ready only after Discord login and permission checks complete. Repair private category/log permissions or clear the optional IDs and use `.setup`.
 - **File permission errors:** check the server volume's ownership in Wings. The runtime user must be able to write config.json, data/, and plugins/.
 - **Viewer missing allocation/OAuth errors:** use a valid primary allocation, complete both OAuth variables, and configure HTTPS forwarding; or leave LOG_VIEWER_URL blank.
