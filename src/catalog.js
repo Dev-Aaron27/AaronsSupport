@@ -31,7 +31,7 @@ const groups = {
   },
   4: {
     disable: ['Disable new conversations or all incoming/outgoing DMs.', '<new|all>'], enable: ['Enable all DM functions.', ''], isenable: ['Show the current DM mode.', ''],
-    activity: ['Set activity type and text.', '<Playing|Listening|Watching|Competing> <text>'], config: ['View or set runtime configuration with JSON values.', '[key JSON-value]'],
+    activity: ['Set activity type and text.', '<Playing|Listening|Watching|Competing> <text>'], config: ['Modify changeable configuration variables for this bot.', '[get|set|remove|help|options]'],
     mention: ['Choose a staff role/user to notify on new tickets, or turn it off.', '<role/user mention|off>'], permissions: ['View command permission levels. Changing them requires level 5.', '[command <name> <2-5>|role <role ID> <2-5>|reset <name>]'],
     ping: ['Show Discord Gateway latency.', ''], prefix: ['Change the command prefix.', '<prefix>'], status: ['Set the online/idle/dnd/invisible presence.', '<online|idle|dnd|invisible>'],
   },
@@ -41,7 +41,7 @@ const groups = {
     debug: ['View recent sanitized operational events (no message bodies or tokens).', ''],
     oauth: ['Inspect OAuth log-viewer setup, login URL, or revoke viewer sessions.', '[status|logoutall]'],
     update: ['Install GitHub main on Pterodactyl, or check the latest revision. Restart from the panel after installing.', '[check]'],
-    plugins: ['Manage trusted local JavaScript plugins.', '[list|load <name>|unload <name>|reload <name>]'],
+    plugins: ['Manage trusted local JavaScript plugins.', '[list|load <name>|unload <name>|reload <name>|guide]'],
   },
 };
 export const commands = Object.fromEntries(Object.entries(groups).flatMap(([level, values]) => Object.entries(values).map(([name, [description, usage]]) => [name, { name, level: Number(level), description, usage }])));

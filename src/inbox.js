@@ -29,7 +29,7 @@ export class Inbox {
     if (ticket.status === 'opening') {
       const channel = await this.transport.open(ticket, user);
       ticket = this.store.updateTicket(ticket.id, { channel_id: channel.id, category_id: this.config.categoryId, status: 'open', last_error: null });
-      await this.transport.notifyUser(user.id, this.config.welcomeMessage).catch(() => {});
+      await this.transport.notifyUser(user.id, this.config.welcomeMessage, { title: 'Ticket Created', color: this.config.colors.member }).catch(() => {});
       await this.transport.notifyOpening?.(ticket);
       this.store.event(ticket.id, user.id, 'opened');
       await this.plugins?.emit('threadOpen', { ticket });

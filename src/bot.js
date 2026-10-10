@@ -78,7 +78,7 @@ export class DiscordTransport {
     channel=await guild.channels.create({name:ticket.title || `inbox-${ticket.id}`,type:ChannelType.GuildText,parent:category.id,nsfw:Boolean(ticket.nsfw),topic:`modmail:${ticket.id}:${ticket.user_id}`,permissionOverwrites:this.overwrites(guild),reason:`Modmail #${ticket.id}`});
     const member = await this.member(user.id);
     const date = timestamp => Number.isFinite(timestamp) ? `<t:${Math.floor(timestamp / 1000)}:F>` : 'Unavailable';
-    await sendPanels(channel,`**Member:** ${user.tag || user.username}\n**User ID:** ${user.id}\n**Account created:** ${date(user.createdTimestamp)}\n**Joined server:** ${date(member?.joinedTimestamp)}\n\nUse ${this.config.prefix}reply (${this.config.prefix}r) for a named reply or ${this.config.prefix}areply (${this.config.prefix}ar) for an anonymous reply. Only reply commands and snippets send messages to the member. Normal messages stay in this channel; ${this.config.prefix}note saves an internal note in the log.\n\nReplies are copied here and to the member’s DMs. Edits and deletions are retained in the private audit log.`,{title:`Conversation #${ticket.id}`,color:this.config.colors.system,controls:[button('Close',`ticket:close:${ticket.id}`),button('Snooze',`ticket:snooze:${ticket.id}`),button('History',`ticket:logs:${ticket.id}`)]});
+    await sendPanels(channel,`> **Member Information**\n👤 **User:** ${user.tag || user.username} (<@${user.id}>)\n🆔 **ID:** \`${user.id}\`\n📅 **Account Created:** ${date(user.createdTimestamp)}\n📥 **Joined Server:** ${date(member?.joinedTimestamp)}\n\n> **Quick Commands**\n💬 **Reply:** \`${this.config.prefix}reply\` (\`${this.config.prefix}r\`)\n👻 **Anon Reply:** \`${this.config.prefix}areply\` (\`${this.config.prefix}ar\`)\n📝 **Internal Note:** \`${this.config.prefix}note\`\n\n*Any regular message sent here is staff-only. Only commands send messages to the member. All actions are securely recorded.*`,{title:`Conversation #${ticket.id}`,color:this.config.colors.system,controls:[button('Close',`ticket:close:${ticket.id}`),button('Snooze',`ticket:snooze:${ticket.id}`),button('History',`ticket:logs:${ticket.id}`)]});
     return channel;
   }
   async notifyOpening(ticket) {
@@ -110,7 +110,7 @@ export class DiscordTransport {
   async delete(row) { try { await (await this.channel(row.target_channel))?.messages.delete(row.target_id); } catch(error) { if(error.code!==10008) throw error; } }
   async deleteSource(row) { const id = row.options.commandSourceId || row.source_id; if(!/^\d+$/.test(id)) return; try { await (await this.channel(row.source_channel))?.messages.delete(id); } catch(error) { if(error.code!==10008) throw error; } }
   async acknowledge(row) { const channel = await this.channel(row.source_channel); const message = await channel.messages.fetch(row.source_id); await message.react('✅'); }
-  async notifyUser(id,content) {return sendPanels(await (await this.user(id)).createDM(),content,{color:this.config.colors.system});}
+  async notifyUser(id,content,options={}) {return sendPanels(await (await this.user(id)).createDM(),content,{color:this.config.colors.system, ...options});}
   async alert(ticket,content,mentions=[]) {const channel=await this.channel(ticket.channel_id);await this.assertPrivate(channel);return sendPanels(channel,content,{color:this.config.colors.system,mentions});}
   async publishArchive(ticket,path,archives) {
     const channel=await this.channel(this.config.logChannelId); await this.assertPrivate(channel);

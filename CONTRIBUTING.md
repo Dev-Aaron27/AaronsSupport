@@ -1,28 +1,36 @@
-# Contributing
+# 🤝 Contributing to Aaron's Support
 
-Thanks for helping improve Aaron’s Support. Open an issue to report a bug or discuss a change, or submit a pull request with a focused fix.
+Thank you for your interest in improving **Aaron’s Support**! Whether you're fixing a bug, writing a new feature, or enhancing the documentation, your help is appreciated. 
 
-## Local development
+Please open an issue to report a bug or discuss a major change before submitting a pull request.
 
-Use Node.js 24 or newer. Install the locked dependencies:
+---
+
+## 💻 Local Development Setup
+
+To get started, you will need **Node.js 24+**.
+
+1. **Install locked dependencies:**
+   ```sh
+   npm ci
+   ```
+2. **Configure your environment:**
+   Copy `.env.example` to `.env` and `config.example.json` to `config.json`. You should use a separate Discord application and test server for development to avoid production accidents. 
+   *(See the [installation guide](docs/setup.md) for required intents and permissions.)*
+
+> **⚠️ Security Note:** Keep bot tokens, OAuth secrets, production databases, and user attachments out of commits and issue reports. Use synthetic identities and data when creating test fixtures.
+
+---
+
+## 🧪 Automated Checks
+
+Before submitting a PR, ensure that your code passes all quality checks:
 
 ```sh
-npm ci
-```
-
-Copy `.env.example` to `.env` and `config.example.json` to `config.json` if you need to run the bot. Use a separate Discord application and server for development. See the [installation guide](docs/setup.md) for the required permissions.
-
-Keep bot tokens, OAuth secrets, databases, and conversation attachments out of commits and issue reports. Use synthetic identities and messages in fixtures.
-
-## Automated checks
-
-Run the checks relevant to your change before submitting it:
-
-```sh
-npm run check
-npm test
-npm audit --omit=dev
-npm run docs:build
+npm run check           # Lints your code
+npm test                # Runs unit & integration tests
+npm audit --omit=dev    # Checks for vulnerabilities
+npm run docs:build      # Verifies documentation builds correctly
 ```
 
 The tests live in `test/` and use temporary databases and simulated Discord/OAuth responses. Changes to Gateway delivery, permission overwrites, or OAuth setup also need a check against a development Discord server.

@@ -1,20 +1,26 @@
 # Aaron’s Support
 
-A self-hosted modmail bot for Discord. Give your moderation team a shared inbox where members can ask questions, send reports, and follow up privately.
+[![Discord](https://img.shields.io/badge/Discord-Modmail-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://github.com/Dev-Aaron27/AaronsSupport)
+[![Node.js](https://img.shields.io/badge/Node.js-24.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-Members DM the bot. Staff receive the conversation in a private server channel and reply through the bot’s account. When the conversation ends, the bot saves a transcript and posts it to your log channel.
+> **A self-hosted modmail bot for Discord.** Give your moderation team a shared inbox where members can ask questions, send reports, and follow up privately.
 
-[Documentation](docs/index.md) · [Pterodactyl setup](docs/pterodactyl.md) · [Report a bug](https://github.com/Dev-Aaron27/AaronsSupport/issues)
+Members DM the bot, and staff receive the conversation in a private server channel. Staff can reply seamlessly through the bot’s account. When the conversation concludes, the bot saves a clean transcript and posts it to your log channel.
 
-## Features
+[📚 Documentation](docs/index.md) &nbsp;·&nbsp; [🚀 Pterodactyl Setup](docs/pterodactyl.md) &nbsp;·&nbsp; [🐛 Report a Bug](https://github.com/Dev-Aaron27/AaronsSupport/issues)
 
-- **Shared inbox:** private staff channels, named or anonymous replies, internal notes, and conversations with multiple members.
-- **Message relay:** text, images, and files, with synchronized edits and deletes.
-- **Conversation history:** saved transcripts and attachments, member history search, and an optional log viewer with Discord login.
-- **Staff tools:** canned replies, command aliases, notifications, snoozing, and scheduled closing.
-- **Access controls:** five command permission levels, user and role blocks, and minimum account and membership ages.
-- **Customization:** bot status, prefix, colors, welcome messages, and local JavaScript plugins.
-- **Mention removal:** `@everyone 67` is relayed as `[REMOVED_PING] 67`.
+---
+
+## ✨ Features
+
+- 🔒 **Shared inbox:** Private staff channels, named/anonymous replies, internal notes, and conversations with multiple members.
+- 📎 **Message relay:** Fully synced text, images, and files, including edits and deletes.
+- 🗄️ **Conversation history:** Saved transcripts, member history search, and an optional **log viewer with Discord login**.
+- 🛠️ **Staff tools:** Canned replies, command aliases, notifications, snoozing, and scheduled auto-closing.
+- 🛡️ **Access controls:** Five command permission levels, user/role blocks, and minimum account age checks.
+- 🎨 **Customization:** Bot status, prefix, custom colors, welcome messages, and local JavaScript plugins.
+- 🧹 **Mention removal:** Automatically neutralizes mentions like `@everyone 67` into `[REMOVED_PING] 67`.
 
 The default prefix is **`.`**. Replies use Discord Components V2.
 
@@ -72,8 +78,9 @@ Once the bot is online, run `.setup` as the server owner. See the [installation 
 
 The [usage guide](docs/usage.md) covers replies, attachments, snippets, participants, and notifications.
 
-## Documentation
+## 📚 Documentation
 
+- [Advanced Usage & Workflows](docs/advanced-usage.md)
 - [Choosing a host](docs/choose-host.md)
 - [Installation](docs/setup.md)
 - [Configuration and permissions](docs/configuration.md)

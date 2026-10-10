@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { commands, replyCommands, replyOptions } from './catalog.js';
 import { authorize, requiredLevel } from './permissions.js';
 import { validateConfig, runtimeKeys, parseDuration } from './config.js';
-import { button, sendPanels, formatVariables, stripPings } from './ui.js';
+import { button, selectMenu, sendPanels, formatVariables, stripPings } from './ui.js';
 
 export const idFrom = value => /^(?:<@!?|<#)?(\d{17,20})>?$/.exec(value || '')?.[1];
 export const firstArg = args => {const match=/^(\S+)(?:\s+([\s\S]*))?$/.exec(args.trim());return [match?.[1] || '',match?.[2] || ''];};
@@ -46,6 +46,8 @@ export class CommandRouter {
     const available=[...Object.values(commands),...[...(this.plugins?.registry || [])].map(([name,spec])=>({name,...spec}))];
     const pages=Math.max(1,Math.ceil(available.length/10)), page=Math.min(pageNumber(args),pages);
     const controls=[];
+    const options = available.slice((page-1)*10,page*10).map(c=>({label: c.name, value: `help:${ctx.message.author.id}:${c.name}`, description: c.description.slice(0,100)}));
+    if(options.length)controls.push(selectMenu(`help:${ctx.message.author.id}:_menu`, options, `Select a command...`));
     if(page>1)controls.push(button('Previous',`help:${ctx.message.author.id}:${page-1}`));
     if(page<pages)controls.push(button('Next',`help:${ctx.message.author.id}:${page+1}`));
     return ctx.respond(available.slice((page-1)*10,page*10).map(c=>`**[${requiredLevel(c.name,this.config,this.plugins)}] ${this.config.prefix}${c.name}**: ${c.description}`).join('\n')+`\n\nPage ${page} of ${pages} · ${this.config.prefix}help command for details.\nNumbers in brackets show the permission level required to run each command.`,{title:'Modmail commands',controls});
@@ -174,10 +176,43 @@ export class CommandRouter {
       case 'mention':this.set('mention',first==='off'?null:await this.target(first,actor));return respond('Opening notification updated.');
       case 'ping':return respond(`Gateway latency: ${Math.round(this.transport.client.ws.ping)} ms.`);
       case 'config': {
-        if(!first)return respond(`Editable runtime keys: ${[...runtimeKeys].join(', ')}. Use config <key> <JSON-value>. IDs and roles require setup/permissions or config.json plus restart.`);
-        if(!runtimeKeys.has(first))throw new Error('Use a listed runtime key. Permissions and plugin activation use their dedicated commands.');
-        if(!rest)return respond(`${first}: ${JSON.stringify(this.config[first],null,2)}`);
-        this.set(first,JSON.parse(rest));this.transport.presence();return respond(`${first} updated.`);
+        const [subCommand, subArgs] = firstArg(args);
+        const action = subCommand ? subCommand.toLowerCase() : 'help';
+        if (action === 'help') {
+          if (!subArgs) {
+            return respond(`.[config|configuration]\nModify changeable configuration variables for this bot.\n\nType \`${this.config.prefix}config options\` to view a list\nof valid configuration variables.\n\nType \`${this.config.prefix}config help config-name\` for info\non a config.\n\nTo set a configuration variable:\n\`${this.config.prefix}config set config-name value here\`\n\nTo remove a configuration variable:\n\`${this.config.prefix}config remove config-name\`\nPermission Level\nADMINISTRATOR [4]\nSub Command(s)\n├─ get - Show the configuration variables that are currently set.\n├─ help - Show information on a specified configuration.\n├─ options - Return a list of valid configuration names you can change.\n├─ remove - Delete a set configuration variable.\n└─ set - Set a configuration variable and its value.`);
+          }
+          if (runtimeKeys.has(subArgs)) return respond(`**${subArgs}**\nThis is a valid configuration variable. Type \`${this.config.prefix}config get\` to see its current value.`);
+          return respond(`Unknown configuration variable: ${subArgs}`);
+        }
+        if (action === 'get') {
+          const current = {};
+          for (const key of runtimeKeys) if (this.config[key] !== undefined) current[key] = this.config[key];
+          return respond(`Currently set variables:\n\`\`\`json\n${JSON.stringify(current, null, 2)}\n\`\`\``);
+        }
+        if (action === 'remove') {
+          if (!subArgs) throw new Error('Provide a configuration variable to remove.');
+          const [key] = firstArg(subArgs);
+          if (!runtimeKeys.has(key)) throw new Error('Unknown configuration variable.');
+          this.set(key, null); this.transport.presence();
+          return respond(`Removed configuration variable: ${key}`);
+        }
+        if (action === 'set') {
+          const [key, val] = firstArg(subArgs);
+          if (!key || !val) throw new Error('Provide a configuration variable and its JSON value.');
+          if (!runtimeKeys.has(key)) throw new Error('Unknown configuration variable.');
+          this.set(key, JSON.parse(val)); this.transport.presence();
+          return respond(`${key} updated.`);
+        }
+        if (action === 'options') {
+          const keys = [...runtimeKeys].sort();
+          const pages = Math.max(1, Math.ceil(keys.length / 15)), page = Math.min(pageNumber(subArgs), pages);
+          const controls = [];
+          if(page > 1) controls.push(button('Previous', `config:${actor}:${page-1}`));
+          if(page < pages) controls.push(button('Next', `config:${actor}:${page+1}`));
+          return respond(`**Available configuration keys:**\n${keys.slice((page-1)*15, page*15).join('\n')}\n\nPage ${page} of ${pages}`, {controls});
+        }
+        throw new Error('Unknown subcommand. Use get, help, options, remove, or set.');
       }
       case 'permissions': {
         if(!first)return respond(`Your level: ${ctx.level}\nRole levels: ${JSON.stringify(this.config.permissionRoles)}\nCommand overrides: ${JSON.stringify(this.config.commandLevels)}\nLevels: 1 member, 2 staff, 3 senior staff, 4 administrator, 5 owner. Overrides can raise command requirements.`);
@@ -209,8 +244,9 @@ export class CommandRouter {
       }
       case 'plugins': {
         if(!this.plugins)throw new Error('Plugin manager is unavailable.');
+        if(first==='guide')return respond(`**Plugins Guide**\nPlugins are local JavaScript modules placed in the \`plugins/\` directory.\nThey can add new commands (like \`.ticketstats\`) and listen to hooks like \`threadOpen\` or \`message\`.\n\nUse \`${this.config.prefix}plugins list\` to see available plugins, and \`${this.config.prefix}plugins load <name>\` to enable one.\nChanges to plugin entry files reload when you use \`${this.config.prefix}plugins reload <name>\`, but dependency changes require a restart.\nRead \`docs/plugins.md\` in the source repository for the full API documentation.`);
         if(!first || first==='list')return respond(`Available: ${(await this.plugins.available()).join(', ') || '(none)'}\nLoaded: ${[...this.plugins.loaded.keys()].join(', ') || '(none)'}\nPlugins are trusted local JavaScript with full process privileges. Install reviewed source on the host, then load its folder name.`);
-        if(!['load','unload','reload'].includes(first))throw new Error('Use plugins list, load, unload, or reload <name>.');
+        if(!['load','unload','reload'].includes(first))throw new Error('Use plugins list, load, unload, reload <name>, or guide.');
         try {
           if(first==='unload' || first==='reload')await this.plugins.unload(rest);
           if(first==='load' || first==='reload')await this.plugins.load(rest);

@@ -91,8 +91,8 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
     }
   });
   on(Events.InteractionCreate,i=>i.channelId,async interaction=>{
-    if(!interaction.isButton() || interaction.user.bot || interaction.guildId!==config.guildId)return;
-    const recognized=/^(help:|ticket:|confirm:)/.test(interaction.customId);
+    if((!interaction.isButton() && !interaction.isStringSelectMenu()) || interaction.user.bot || interaction.guildId!==config.guildId)return;
+    const recognized=/^(help:|ticket:|confirm:|config:)/.test(interaction.customId);
     if(!recognized)return;
     await interaction.deferReply({flags:MessageFlags.Ephemeral});
     let replied=false;
@@ -109,7 +109,8 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
         if(action!==interaction.user.id)throw new Error('Open your own help menu to use these buttons.');
         const privateChannel=ctx.ticket || interaction.channelId===config.logChannelId;
         if(privateChannel)await transport.assertPrivate(interaction.channel);
-        return router.execute(ctx,'help',value);
+        const arg = interaction.isStringSelectMenu() ? interaction.values[0].split(':').slice(2).join(':') : value;
+        return router.execute(ctx,'help',arg);
       }
       if(!ctx.ticket && interaction.channelId!==config.logChannelId)throw new Error('Use controls inside a private modmail channel.');
       await transport.assertPrivate(interaction.channel);
@@ -122,6 +123,10 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
         authorize(action,ctx.level,config,plugins);
         if(action==='close')return router.confirmation(ctx,'close',[ticket.id],`Close and archive conversation #${ticket.id}?`);
         return router.execute(ctx,action,'');
+      }
+      if(type==='config'){
+        if(action!==interaction.user.id)throw new Error('Open your own config menu to use these buttons.');
+        return router.execute(ctx,'config',`options ${value}`);
       }
     } catch(error){transport.report(error,'interaction');await respond(error.code?'Discord could not complete that action.':error.message).catch(()=>{});}
   });
