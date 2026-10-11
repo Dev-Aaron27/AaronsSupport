@@ -52,7 +52,7 @@ async function boot() {
   if(!token || token==='replace_with_your_bot_token')throw new Error('Set DISCORD_TOKEN in the environment or .env.');
   store=new Store(dir);
   await store.connect();
-  log.info('startup','MongoDB opened. Loading configuration and saved settings.');
+  log.info('startup',`${store.isMongo ? 'MongoDB' : 'SQLite'} opened. Loading configuration and saved settings.`);
   const hostingOverrides=panelOverrides();
   const config=validateConfig({...readConfig(process.env.CONFIG_PATH || './config.json',hostingOverrides),...(await store.settings()),...hostingOverrides});
   log.info('startup',`Configured server ID: ${config.guildId}; prefix: ${config.prefix}`);
