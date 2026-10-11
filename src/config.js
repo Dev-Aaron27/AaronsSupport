@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 const snowflake = /^\d{17,20}$/;
-import { commands } from './catalog.js';
+import { commands, resolveCommandName } from './catalog.js';
 export const defaults = {
   adminRoleIds: [], ownerUserIds: [], permissionRoles: {}, commandLevels: {}, prefix: '.', status: 'DM me to contact the moderators', statusType: 'Watching',
   colors: { member: '#5865F2', staff: '#57F287', system: '#FEE75C' },
@@ -60,13 +60,13 @@ export function validateConfig(input) {
 }
 
 export function readConfig(path, overrides = {}) { return validateConfig({ ...JSON.parse(readFileSync(path, 'utf8')), ...overrides }); }
-export const runtimeKeys = new Set(['prefix', 'status', 'statusType', 'colors', 'minAccountAgeHours', 'minMemberAgeHours', 'messageCooldownSeconds', 'snippets', 'aliases', 'welcomeMessage', 'closeMessage', 'snoozeMode', 'presenceStatus', 'alwaysAnonymous']);
+export const runtimeKeys = new Set(['prefix', 'status', 'statusType', 'colors', 'minAccountAgeHours', 'minMemberAgeHours', 'messageCooldownSeconds', 'welcomeMessage', 'closeMessage', 'snoozeMode', 'presenceStatus', 'alwaysAnonymous']);
 
-const shorthand = { r: 'reply', ar: 'areply' };
 const commandParts = text => {
   const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(text.trim());
-  const name = (match?.[1] || '').toLowerCase();
-  return { name: shorthand[name] || name, args: match?.[2] || '' };
+  const raw = (match?.[1] || '').toLowerCase();
+  const name = resolveCommandName(raw);
+  return { name, args: match?.[2] || '' };
 };
 export function aliasSteps(value) {
   const steps = value.split('&&').map(commandParts);

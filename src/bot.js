@@ -45,11 +45,11 @@ export class DiscordTransport {
     await this.assertPrivate(category); await this.assertPrivate(log);
     const required=[P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AttachFiles,P.EmbedLinks,P.ManageChannels,P.ManageRoles,P.ManageMessages,P.AddReactions];
     if(!guild.members.me.permissions.has(P.ManageChannels) || !category.permissionsFor(guild.members.me).has(required) || !log.permissionsFor(guild.members.me).has(required.slice(0,5))) throw new Error('Bot is missing required permissions. See the setup guide.');
-    for(const ticket of store.live()) {
+    for(const ticket of await store.live()) {
       if(!ticket.channel_id) continue;
       const channel=await this.channel(ticket.channel_id);
       if(channel) await channel.permissionOverwrites.set(this.overwrites(guild),'Apply modmail staff permissions');
-      else if(ticket.status==='open') store.updateTicket(ticket.id,{status:'broken',last_error:'Staff channel missing; use repair'});
+      else if(ticket.status==='open') await store.updateTicket(ticket.id,{status:'broken',last_error:'Staff channel missing; use repair'});
     }
     this.presence();
   }
@@ -57,14 +57,14 @@ export class DiscordTransport {
     const guild=await this.guild();
     if(!this.config.categoryId) {
       const category=await guild.channels.create({name:'Modmail',type:ChannelType.GuildCategory,permissionOverwrites:this.overwrites(guild)});
-      this.config.categoryId=category.id; store.setSetting('categoryId',category.id);
+      this.config.categoryId=category.id; await store.setSetting('categoryId',category.id);
     }
     const category=await guild.channels.fetch(this.config.categoryId);
     if(category?.type!==ChannelType.GuildCategory) throw new Error('categoryId does not point to a category.');
     await this.assertPrivate(category);
     if(!this.config.logChannelId) {
       const channel=await guild.channels.create({name:'modmail-logs',type:ChannelType.GuildText,parent:category.id,permissionOverwrites:this.overwrites(guild)});
-      this.config.logChannelId=channel.id; store.setSetting('logChannelId',channel.id);
+      this.config.logChannelId=channel.id; await store.setSetting('logChannelId',channel.id);
     }
     await this.verify(store);
   }
@@ -134,6 +134,6 @@ export class DiscordTransport {
     // Only known operational hints are logged, never raw API errors or message bodies.
     const summary=`${context}: ${safeError(error)}`;
     this.logger.error(context,error);
-    this.store?.event(null,'system',summary.slice(0,300));
+    this.store?.event(null,'system',summary.slice(0,300)).catch(e => this.logger.error('system', e));
   }
 }

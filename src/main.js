@@ -35,7 +35,7 @@ async function shutdown(code=0) {
     await viewer?.stop();
   } catch(error) { log.error('shutdown',error);code=1; }
   await client?.destroy();
-  store?.close();
+  if (store) await store.close();
   log.info('shutdown',`Stopped with exit code ${code}.`);
   process.exitCode=code;
 }
@@ -51,9 +51,10 @@ async function boot() {
   const token=process.env.DISCORD_TOKEN;
   if(!token || token==='replace_with_your_bot_token')throw new Error('Set DISCORD_TOKEN in the environment or .env.');
   store=new Store(dir);
-  log.info('startup','SQLite opened. Loading configuration and saved settings.');
+  await store.connect();
+  log.info('startup','MongoDB opened. Loading configuration and saved settings.');
   const hostingOverrides=panelOverrides();
-  const config=validateConfig({...readConfig(process.env.CONFIG_PATH || './config.json',hostingOverrides),...store.settings(),...hostingOverrides});
+  const config=validateConfig({...readConfig(process.env.CONFIG_PATH || './config.json',hostingOverrides),...(await store.settings()),...hostingOverrides});
   log.info('startup',`Configured server ID: ${config.guildId}; prefix: ${config.prefix}`);
   client=new Client({
     intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.DirectMessages,GatewayIntentBits.MessageContent],
@@ -80,9 +81,9 @@ async function boot() {
       if(!config.categoryId || !config.logChannelId)log.warn('startup',`Inbox setup is incomplete. Run ${config.prefix}setup in the configured server as its owner.`);
       log.info('startup',`Prefix: ${config.prefix}; presence: ${config.presenceStatus}; activity: ${config.statusType} ${config.status || '(none)'}.`);
       log.info('startup','Management commands work in private staff channels. Reply commands require an active ticket.');
-      for(const ticket of store.live())for(const row of store.messages(ticket.id)) {
+      for(const ticket of await store.live())for(const row of await store.messages(ticket.id)) {
         if(row.delivery==='pending') {
-          store.updateMessage(row.id,{delivery:'failed'});
+          await store.updateMessage(row.id,{delivery:'failed'});
           await transport.alert(ticket,`Delivery of ${row.source_id} was interrupted. Check the recipient before using ${config.prefix}retry ${row.source_id}; delivery may already have occurred.`).catch(error=>transport.report(error,'startup delivery notice'));
         }
       }
@@ -94,7 +95,7 @@ async function boot() {
       if(stopping)return;
       handlers.start();
       await tick();
-      const live=store.live();
+      const live=await store.live();
       log.info('startup',`Active conversations: ${live.length}; scheduled closures: ${live.filter(t=>t.close_at).length}; snoozed: ${live.filter(t=>t.snoozed_at).length}.`);
       log.info('startup',`Updates are manual. Use ${config.prefix}update check to check GitHub.`);
       timer=setInterval(()=>tick().catch(error=>transport.report(error,'scheduler')),10000);

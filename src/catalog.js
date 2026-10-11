@@ -41,9 +41,39 @@ const groups = {
     debug: ['View recent sanitized operational events (no message bodies or tokens).', ''],
     oauth: ['Inspect OAuth log-viewer setup, login URL, or revoke viewer sessions.', '[status|logoutall]'],
     update: ['Install GitHub main on Pterodactyl, or check the latest revision. Restart from the panel after installing.', '[check]'],
-    plugins: ['Manage trusted local JavaScript plugins.', '[list|load <name>|unload <name>|reload <name>|guide]'],
+    plugins: ['Manage trusted local or GitHub JavaScript plugins.', '[list|load <name|url>|install <url>|unload <name>|reload <name>|guide]'],
   },
 };
 export const commands = Object.fromEntries(Object.entries(groups).flatMap(([level, values]) => Object.entries(values).map(([name, [description, usage]]) => [name, { name, level: Number(level), description, usage }])));
+export const commandAliases = {
+  plugin: 'plugins',
+  permission: 'permissions',
+  perms: 'permissions',
+  perm: 'permissions',
+  configuration: 'config',
+  settings: 'config',
+  setting: 'config',
+  sponsor: 'sponsors',
+  changelogs: 'changelog',
+  autotriggers: 'autotrigger',
+  del: 'delete',
+  add: 'adduser',
+  addmember: 'adduser',
+  anonadd: 'anonadduser',
+  remove: 'removeuser',
+  removemember: 'removeuser',
+  anonremove: 'anonremoveuser',
+  sub: 'subscribe',
+  unsub: 'unsubscribe',
+  notes: 'note',
+  cmds: 'help',
+  h: 'help',
+  r: 'reply',
+  ar: 'areply',
+};
+export function resolveCommandName(name) {
+  const lower = String(name || '').toLowerCase();
+  return commandAliases[lower] || lower;
+}
 export const replyCommands = new Set(['reply','areply','anonreply','preply','pareply','freply','fareply','fpreply','fpareply']);
 export function replyOptions(name, config) { return { anonymous: config.alwaysAnonymous || ['areply','anonreply','pareply','fareply','fpareply'].includes(name), plain: ['preply','pareply','fpreply','fpareply'].includes(name), formatted: name.startsWith('f') }; }

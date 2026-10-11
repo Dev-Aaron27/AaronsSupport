@@ -153,3 +153,51 @@ test('update installs only for owners on managed hosts and tells them to restart
   await router.execute(ctx,'update','check');assert.equal(applied,0);assert.match(responses.at(-1),/GitHub main/);
   await router.execute(ctx,'update');assert.equal(applied,1);assert.match(responses.at(-1),/Restart the server from the panel/);
 });
+
+test('command variations and aliases resolve to canonical commands', () => {
+  const cfg = config();
+  assert.equal(parseCommand('.plugin list', cfg).name, 'plugins');
+  assert.equal(parseCommand('.permission', cfg).name, 'permissions');
+  assert.equal(parseCommand('.perms', cfg).name, 'permissions');
+  assert.equal(parseCommand('.perm', cfg).name, 'permissions');
+  assert.equal(parseCommand('.configuration get', cfg).name, 'config');
+  assert.equal(parseCommand('.settings', cfg).name, 'config');
+  assert.equal(parseCommand('.sponsor', cfg).name, 'sponsors');
+  assert.equal(parseCommand('.changelogs', cfg).name, 'changelog');
+  assert.equal(parseCommand('.del 123', cfg).name, 'delete');
+  assert.equal(parseCommand('.add 123', cfg).name, 'adduser');
+  assert.equal(parseCommand('.remove 123', cfg).name, 'removeuser');
+  assert.equal(parseCommand('.sub <@123>', cfg).name, 'subscribe');
+  assert.equal(parseCommand('.unsub <@123>', cfg).name, 'unsubscribe');
+  assert.equal(parseCommand('.notes hello', cfg).name, 'note');
+});
+
+test('GitHub plugin installer parses URLs and installs plugins', async t => {
+  const dir = await temp(t);
+  const store = {
+    pluginGet: () => undefined,
+    pluginSet: () => {},
+    event: () => {},
+    setSetting: async () => {},
+    settings: () => ({})
+  };
+  const root = join(dir, 'plugins');
+  await mkdir(root, { recursive: true });
+  const manager = new Plugins(root, store, { config: config(), report: () => {}, info: () => {} });
+  const res = await manager.install('https://github.com/Dev-Aaron27/Modmail-Plugins/plugins/say');
+  assert.equal(res.name, 'say');
+  await manager.load('say');
+  assert.ok(manager.command('say'));
+  assert.equal(manager.command('say').level, 4);
+
+  const responses = [];
+  const router = new CommandRouter({ config: config() }, {}, store, manager);
+  const ctx = {
+    level: 5,
+    message: { author: { id: 'owner' }, channel: { send: async () => ({}) } },
+    respond: async text => responses.push(text)
+  };
+  await router.execute(ctx, 'plugin', 'load https://github.com/Dev-Aaron27/Modmail-Plugins/plugins/say');
+  assert.match(responses.at(-1), /loaded successfully/i);
+});
+

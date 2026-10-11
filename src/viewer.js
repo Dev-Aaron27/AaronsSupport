@@ -53,13 +53,13 @@ export class LogViewer {
     }
     if(req.method!=='GET'){res.writeHead(405);res.end('Method not allowed.');return;}
     if(url.pathname==='/') {
-      const rows=this.store.recentTickets();res.setHeader('Content-Type','text/html; charset=utf-8');
+      const rows=await this.store.recentTickets();res.setHeader('Content-Type','text/html; charset=utf-8');
       res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Private modmail logs</title><h1>Private modmail logs</h1><p>Most recent 100 conversations. Use Discord's logs command for member searches.</p><ul>${rows.map(t=>`<li><a href="/tickets/${t.id}/">#${t.id}</a> · Member ${escapeHtml(t.user_id)} · ${escapeHtml(t.status)}</li>`).join('')}</ul><form method="post" action="/logout"><button>Log out</button></form></html>`);return;
     }
-    const match=/^\/tickets\/(\d+)(\/.*)?$/.exec(url.pathname);const ticket=match?this.store.ticket(Number(match[1])):null;
+    const match=/^\/tickets\/(\d+)(\/.*)?$/.exec(url.pathname);const ticket=match?await this.store.ticket(Number(match[1])):null;
     if(!ticket){res.writeHead(404);res.end('Not found.');return;}
     if(!match[2])return this.redirect(res,`/tickets/${ticket.id}/`);
-    const messages=this.store.messages(ticket.id),revisions=this.store.revisions(ticket.id);
+    const messages=await this.store.messages(ticket.id),revisions=await this.store.revisions(ticket.id);
     if(match[2]==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(this.archives.html(ticket,messages));return;}
     if(match[2]==='/archive' && ticket.status==='closed' && ticket.archive_path)return this.file(res,ticket.archive_path,`ticket-${ticket.id}.zip`);
     if(match[2].startsWith('/attachments/')) {

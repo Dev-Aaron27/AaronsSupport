@@ -1,7 +1,7 @@
 import { ChannelType, Events, MessageFlags } from 'discord.js';
 import { SerialQueue } from './store.js';
 import { parseCommand } from './config.js';
-import { commands, replyCommands } from './catalog.js';
+import { commands, replyCommands, resolveCommandName } from './catalog.js';
 import { CommandRouter } from './commands.js';
 import { panel, chunks, sendPanels, formatVariables, stripPings } from './ui.js';
 import { safeError } from './logging.js';
@@ -14,7 +14,7 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
   const on=(event,key,handler)=>client.on(event,(...args)=>{if(accepting)events.run(key(...args),()=>handler(...args)).catch(e=>transport.report(e,event));});
   async function context(message,respond) {
     const member=await transport.member(message.author.id),level=transport.level(member);
-    return {message,member,level,ticket:store.byChannel(message.channelId),respond:respond || ((text,options)=>sendPanels(message.channel,text,{color:config.colors.system,...options}))};
+    return {message,member,level,ticket:(await store.byChannel(message.channelId)),respond:respond || ((text,options)=>sendPanels(message.channel,text,{color:config.colors.system,...options}))};
   }
   on(Events.MessageCreate,m=>m.channelId,async message=>{
     if(message.author.bot || message.webhookId)return;
@@ -22,7 +22,7 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
     const respond = (text) => sendPanels(message.channel,text,{color:config.colors.system});
     try {
       const cmd=parseCommand(message.content,config);
-      const known = step => Object.hasOwn(commands,step.name) || plugins?.command(step.name);
+      const known = step => { const n = resolveCommandName(step.name); return Object.hasOwn(commands, n) || Boolean(plugins?.command(n)) || Object.hasOwn(commands, step.name) || Boolean(plugins?.command(step.name)); };
       if(cmd) {
         commandLabel=(cmd.steps || [cmd]).map(step=>known(step)?step.name:'unknown').join(' + ');
         transport.info?.('commands',`Received ${commandLabel}; user ${message.author.id}; channel ${message.channelId}.`);
@@ -63,7 +63,7 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
     }
   });
   on(Events.MessageUpdate,(_old,m)=>m.channelId,async(_old,partial)=>{
-    const row=store.message(partial.id);if(!row)return;
+    const row=await store.message(partial.id);if(!row)return;
     const message=partial.partial?await partial.fetch():partial;
     if(message.author.bot)return;
     let content=message.content;
@@ -76,16 +76,16 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
       if(cmd && (replyCommands.has(cmd.name) || cmd.name==='note'))content=cmd.args;
       else if(cmd?.name==='snippet' && Object.hasOwn(config.snippets,cmd.args))content=config.snippets[cmd.args];
       else if(cmd)return ctx.respond('This edit was not relayed. Edit the reply text or use the edit command.');
-      if(row.options.formatted)content=formatVariables(content,{ticket:store.ticket(row.ticket_id),user:await transport.user(store.ticket(row.ticket_id).user_id),moderator:row.options.anonymous?{displayName:'Moderation team'}:ctx.member,guild:await transport.guild()});
+      if(row.options.formatted)content=formatVariables(content,{ticket:(await store.ticket(row.ticket_id)),user:await transport.user((await store.ticket(row.ticket_id)).user_id),moderator:row.options.anonymous?{displayName:'Moderation team'}:ctx.member,guild:await transport.guild()});
     }
     await inbox.edit(message,content);
   });
   on(Events.MessageDelete,m=>m.channelId,m=>inbox.delete(m.id));
   on(Events.MessageBulkDelete,messages=>messages.first()?.channelId,async messages=>{for(const id of messages.keys())await inbox.delete(id);});
   on(Events.ChannelDelete,channel=>channel.id,async channel=>{
-    const ticket=store.byChannel(channel.id);
+    const ticket=await store.byChannel(channel.id);
     if(ticket?.status==='open') {
-      await inbox.queue.run(ticket.user_id,()=>{if(store.ticket(ticket.id).status==='open')store.updateTicket(ticket.id,{status:'broken',last_error:'Staff channel removed; use repair'});});
+      await inbox.queue.run(ticket.user_id,async()=>{if((await store.ticket(ticket.id)).status==='open')await store.updateTicket(ticket.id,{status:'broken',last_error:'Staff channel removed; use repair'});});
       const logs=await transport.channel(config.logChannelId);
       if(logs){await transport.assertPrivate(logs);await sendPanels(logs,`Conversation #${ticket.id} lost its staff channel. Incoming DMs will be saved. Use ${config.prefix}repair ${ticket.id} to restore it.`);}
     }
@@ -116,7 +116,7 @@ export function installHandlers(client,inbox,transport,store,plugins,viewer) {
       await transport.assertPrivate(interaction.channel);
       if(type==='confirm')return await router.confirm(ctx,action);
       if(type==='ticket'){
-        const ticket=store.ticket(Number(value));
+        const ticket=await store.ticket(Number(value));
         if(!ticket || ticket.channel_id!==interaction.channelId || ticket.status!=='open')throw new Error('These controls are no longer active.');
         ctx.ticket=ticket;
         if(!['close','snooze','logs'].includes(action))throw new Error('Unknown control.');
